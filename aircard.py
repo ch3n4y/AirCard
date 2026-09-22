@@ -34,16 +34,16 @@ from apply_card_skin import (
     native,
     operation_ok,
     write_file,
+    invalidate_cache,
     ROOT,
     DEVICE_HELPER,
 )
+from card_assets import CACHE_FILES
 
 TARGET_ASSETS = [
     "cardBackgroundCombined@3x.png",
     "cardBackgroundCombined@2x.png",
 ]
-
-CACHE_FILES = ["FrontFace", "Preview"]
 
 CARDS_STORE_PATH = Path.home() / ".aircard_cards.json"
 LEGACY_STORE_PATH = Path.home() / ".lumicards_cards.json"
@@ -375,11 +375,9 @@ def main():
             status = "OK" if ok else "FAIL"
             print(f"  -> {asset}: {status}")
 
-        for ext in [".cache", ".pkcache"]:
-            cache_dir = f"/var/mobile/Library/Passes/Cards/{h}{ext}"
-            for leaf in CACHE_FILES:
-                write_file(device["udid"], cache_dir, leaf, b"corrupted")
-        print("  -> System cache cleared (.cache & .pkcache)")
+        ok_cache = invalidate_cache(device["udid"], h)
+        status = "OK" if ok_cache else "PARTIAL"
+        print(f"  -> System cache cleared (.cache & .pkcache): {status}")
 
     print("\n" + "=" * 60)
     print("🎉 DONE! All selected cards successfully updated!")
