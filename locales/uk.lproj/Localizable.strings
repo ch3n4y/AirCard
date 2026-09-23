@@ -8,6 +8,7 @@
 "bold.short_regular" = "Звичайний";
 "error.failed_to_inspect_passthm_file" = "Не вдалося прочитати файл .passthm";
 "error.failed_to_package_theme_for" = "Не вдалося підготувати тему до запису.";
+"error.no_backup_for_card" = "Для цієї картки немає збереженого оригіналу, тому відновити її неможливо.";
 "error.no_iphone_connected" = "iPhone не підключено.";
 "error.one_or_more_cards_could" = "Деякі картки не вдалося оновити. Перегляньте журнал і повторіть спробу.";
 "error.please_add_at_least_one" = "Спершу додайте хоча б одну іконку клавіші або імпортуйте постер.";
@@ -31,6 +32,9 @@
 "panel.export_prompt" = "Експортувати";
 "panel.save_theme_title" = "Зберегти тему код-пароля";
 "status.adopted_poster_slices_to_individual" = "Фрагменти постера перенесено на окремі клавіші";
+"status.backing_up" = "Збереження оригінального оформлення…";
+"status.backup_failed" = "Не вдалося зберегти оригінальне оформлення";
+"status.backup_saved" = "Оригінальне оформлення збережено";
 "status.card_scanning_ended_check_the" = "Сканування карток завершено. Перегляньте журнал і підключіть iPhone знову, щоб спробувати ще раз.";
 "status.card_scanning_failed_check_the" = "Не вдалося просканувати картки. Перегляньте журнал і повторіть спробу.";
 "status.checking_connected_devices" = "Перевірка підключених пристроїв…";
@@ -49,6 +53,9 @@
 "status.poster_image_loaded_ready_to" = "Постер завантажено · можна кадрувати й нарізати";
 "status.preparing_skin" = "[%1$d/%2$d] Підготовка оформлення для %3$@…";
 "status.ready" = "Готово";
+"status.restore_failed" = "Не вдалося відновити картку";
+"status.restored" = "Картку відновлено. Примусово закрийте Wallet, щоб побачити зміни.";
+"status.restoring" = "Відновлення оригінального оформлення…";
 "status.selected_iphone_is_no_longer" = "Вибраний iPhone більше не підключено.";
 "status.starting_passcode_theme_flash" = "Початок запису теми код-пароля…";
 "status.step_message" = "[%1$d/%2$d] %3$@";
@@ -138,6 +145,7 @@
 "ui.no_passthm_loaded_select_a" = "Файл .passthm не завантажено · виберіть пакет теми для запису";
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "На iPhone **двічі натисніть бічну кнопку** (Apple Pay), пройдіть автентифікацію **Face ID** і **торкніться картки**.";
+"ui.original_saved" = "Оригінал збережено";
 "ui.passcode_theme_file" = "Файл теми код-пароля";
 "ui.passcode_theme_successfully_applied_n" = "Тему код-пароля застосовано!\\n\\nЗаблокуйте iPhone (або перезапустіть його), щоб побачити нову клавіатуру код-пароля.";
 "ui.passcode_themes" = "Теми код-пароля:";
@@ -153,6 +161,9 @@
 "ui.reset_position" = "Скинути положення";
 "ui.reset_position_zoom" = "Скинути положення й масштаб";
 "ui.reset_to_iphone_s_detected" = "Повернутися до мови й накреслення, визначених на iPhone";
+"ui.restore_original" = "Відновити оригінальне оформлення";
+"ui.save_original" = "Зберегти оригінальне оформлення";
+"ui.save_original_help" = "Зберегти оригінальне оформлення картки, щоб згодом його повернути";
 "ui.scan_cards" = "Сканувати картки";
 "ui.seamless_poster" = "Суцільний постер";
 "ui.select_all" = "Вибрати все";

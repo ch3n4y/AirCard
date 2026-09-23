@@ -8,6 +8,7 @@
 "bold.short_regular" = "Regular";
 "error.failed_to_inspect_passthm_file" = "Failed to inspect .passthm file";
 "error.failed_to_package_theme_for" = "Failed to package theme for flashing.";
+"error.no_backup_for_card" = "There is no saved original for this card, so it cannot be restored.";
 "error.no_iphone_connected" = "No iPhone connected.";
 "error.one_or_more_cards_could" = "One or more cards could not be updated. Check the log and try again.";
 "error.please_add_at_least_one" = "Please add at least one key icon or import a poster image first.";
@@ -31,6 +32,9 @@
 "panel.export_prompt" = "Export";
 "panel.save_theme_title" = "Save Passcode Theme";
 "status.adopted_poster_slices_to_individual" = "Adopted poster slices to individual keys";
+"status.backing_up" = "Saving original artwork...";
+"status.backup_failed" = "Could not save the original artwork";
+"status.backup_saved" = "Original artwork saved";
 "status.card_scanning_ended_check_the" = "Card scanning ended. Check the log and reconnect the iPhone to retry.";
 "status.card_scanning_failed_check_the" = "Card scanning failed. Check the log and retry.";
 "status.checking_connected_devices" = "Checking connected devices...";
@@ -49,6 +53,9 @@
 "status.poster_image_loaded_ready_to" = "Poster image loaded · Ready to frame and slice";
 "status.preparing_skin" = "[%1$d/%2$d] Preparing skin for %3$@...";
 "status.ready" = "Ready";
+"status.restore_failed" = "Could not restore the card";
+"status.restored" = "Card restored. Force-close Wallet to see it.";
+"status.restoring" = "Restoring original artwork...";
 "status.selected_iphone_is_no_longer" = "Selected iPhone is no longer connected.";
 "status.starting_passcode_theme_flash" = "Starting passcode theme flash...";
 "status.step_message" = "[%1$d/%2$d] %3$@";
@@ -138,6 +145,7 @@
 "ui.no_passthm_loaded_select_a" = "No .passthm loaded · Select a theme package to flash";
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "On your iPhone, **double-click the Side button** (Apple Pay), authenticate with **Face ID**, and **tap your card**.";
+"ui.original_saved" = "Original artwork is saved";
 "ui.passcode_theme_file" = "Passcode Theme File";
 "ui.passcode_theme_successfully_applied_n" = "Passcode theme successfully applied!\n\nLock your iPhone (or restart) to see your new passcode keypad.";
 "ui.passcode_themes" = "Passcode Themes:";
@@ -153,6 +161,9 @@
 "ui.reset_position" = "Reset Position";
 "ui.reset_position_zoom" = "Reset Position & Zoom";
 "ui.reset_to_iphone_s_detected" = "Reset to iPhone's detected language and font style";
+"ui.restore_original" = "Restore Original Artwork";
+"ui.save_original" = "Save Original Artwork";
+"ui.save_original_help" = "Save this card's original artwork so it can be put back";
 "ui.scan_cards" = "Scan Cards";
 "ui.seamless_poster" = "Seamless Poster";
 "ui.select_all" = "Select All";

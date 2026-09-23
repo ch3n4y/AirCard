@@ -8,6 +8,7 @@
 "bold.short_regular" = "常规";
 "error.failed_to_inspect_passthm_file" = "无法解析 .passthm 文件";
 "error.failed_to_package_theme_for" = "主题打包失败，无法刷入。";
+"error.no_backup_for_card" = "尚未存储这张卡片的原始图像，无法恢复。";
 "error.no_iphone_connected" = "未连接 iPhone。";
 "error.one_or_more_cards_could" = "部分卡片未能更新。请查看日志后重试。";
 "error.please_add_at_least_one" = "请先添加至少一个按键图标，或导入一张海报图片。";
@@ -31,6 +32,9 @@
 "panel.export_prompt" = "导出";
 "panel.save_theme_title" = "存储密码主题";
 "status.adopted_poster_slices_to_individual" = "已将海报切片用作各个按键";
+"status.backing_up" = "正在存储原始图像…";
+"status.backup_failed" = "原始图像存储失败。";
+"status.backup_saved" = "已存储原始图像";
 "status.card_scanning_ended_check_the" = "卡片扫描已结束。请查看日志，重新连接 iPhone 后再试。";
 "status.card_scanning_failed_check_the" = "卡片扫描失败。请查看日志后重试。";
 "status.checking_connected_devices" = "正在检查已连接的设备…";
@@ -49,6 +53,9 @@
 "status.poster_image_loaded_ready_to" = "海报图片已载入 · 可以取景并切分";
 "status.preparing_skin" = "[%1$d/%2$d] 正在准备 %3$@ 的皮肤…";
 "status.ready" = "就绪";
+"status.restore_failed" = "卡片恢复失败。";
+"status.restored" = "卡片已恢复。强制退出“钱包”App 即可看到。";
+"status.restoring" = "正在恢复原始图像…";
 "status.selected_iphone_is_no_longer" = "所选 iPhone 已断开连接。";
 "status.starting_passcode_theme_flash" = "开始刷入密码主题…";
 "status.step_message" = "[%1$d/%2$d] %3$@";
@@ -138,6 +145,7 @@
 "ui.no_passthm_loaded_select_a" = "未载入 .passthm · 请选择要刷入的主题包";
 "ui.ok" = "好";
 "ui.on_your_iphone_double_click" = "在 iPhone 上**连按两下侧边按钮**（Apple Pay），用**面容 ID** 验证，然后**轻点你的卡片**。";
+"ui.original_saved" = "原始图像已存储";
 "ui.passcode_theme_file" = "密码主题文件";
 "ui.passcode_theme_successfully_applied_n" = "密码主题已应用！\\n\\n锁定 iPhone（或重新启动）即可看到新的密码键盘。";
 "ui.passcode_themes" = "密码主题：";
@@ -153,6 +161,9 @@
 "ui.reset_position" = "重置位置";
 "ui.reset_position_zoom" = "重置位置与缩放";
 "ui.reset_to_iphone_s_detected" = "恢复为检测到的 iPhone 语言和字体样式";
+"ui.restore_original" = "恢复原始图像";
+"ui.save_original" = "存储原始图像";
+"ui.save_original_help" = "存储这张卡片的原始图像，以后可随时恢复";
 "ui.scan_cards" = "扫描卡片";
 "ui.seamless_poster" = "无缝海报";
 "ui.select_all" = "全选";

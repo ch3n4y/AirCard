@@ -8,6 +8,7 @@
 "bold.short_regular" = "Normal";
 "error.failed_to_inspect_passthm_file" = "No se ha podido analizar el archivo .passthm";
 "error.failed_to_package_theme_for" = "No se ha podido preparar el tema para aplicarlo.";
+"error.no_backup_for_card" = "Esta tarjeta no tiene ninguna imagen original guardada, así que no se puede restaurar.";
 "error.no_iphone_connected" = "No hay ningún iPhone conectado.";
 "error.one_or_more_cards_could" = "No se han podido actualizar todas las tarjetas. Consulta el registro y vuelve a intentarlo.";
 "error.please_add_at_least_one" = "Añade al menos un icono de tecla o importa una imagen de póster.";
@@ -31,6 +32,9 @@
 "panel.export_prompt" = "Exportar";
 "panel.save_theme_title" = "Guardar tema de código";
 "status.adopted_poster_slices_to_individual" = "Recortes del póster aplicados a las teclas individuales";
+"status.backing_up" = "Guardando la imagen original…";
+"status.backup_failed" = "No se ha podido guardar la imagen original";
+"status.backup_saved" = "Imagen original guardada";
 "status.card_scanning_ended_check_the" = "La búsqueda de tarjetas ha finalizado. Consulta el registro y vuelve a conectar el iPhone para reintentarlo.";
 "status.card_scanning_failed_check_the" = "La búsqueda de tarjetas ha fallado. Consulta el registro e inténtalo de nuevo.";
 "status.checking_connected_devices" = "Comprobando dispositivos conectados…";
@@ -49,6 +53,9 @@
 "status.poster_image_loaded_ready_to" = "Póster cargado · Listo para encuadrar y recortar";
 "status.preparing_skin" = "[%1$d/%2$d] Preparando el diseño de %3$@…";
 "status.ready" = "Listo";
+"status.restore_failed" = "No se ha podido restaurar la tarjeta";
+"status.restored" = "Tarjeta restaurada. Fuerza el cierre de Wallet para verla.";
+"status.restoring" = "Restaurando la imagen original…";
 "status.selected_iphone_is_no_longer" = "El iPhone seleccionado ya no está conectado.";
 "status.starting_passcode_theme_flash" = "Empezando a aplicar el tema de código…";
 "status.step_message" = "[%1$d/%2$d] %3$@";
@@ -138,6 +145,7 @@
 "ui.no_passthm_loaded_select_a" = "Ningún .passthm cargado · Selecciona un paquete de tema para aplicarlo";
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "En el iPhone, **pulsa dos veces el botón lateral** (Apple Pay), autentícate con **Face ID** y **toca la tarjeta**.";
+"ui.original_saved" = "Hay una imagen original guardada";
 "ui.passcode_theme_file" = "Archivo de tema de código";
 "ui.passcode_theme_successfully_applied_n" = "¡Tema de código aplicado!\\n\\nBloquea el iPhone (o reinícialo) para ver el nuevo teclado del código.";
 "ui.passcode_themes" = "Temas de código:";
@@ -153,6 +161,9 @@
 "ui.reset_position" = "Restablecer posición";
 "ui.reset_position_zoom" = "Restablecer posición y zoom";
 "ui.reset_to_iphone_s_detected" = "Restablecer el idioma y el estilo de fuente detectados en el iPhone";
+"ui.restore_original" = "Restaurar imagen original";
+"ui.save_original" = "Guardar imagen original";
+"ui.save_original_help" = "Guardar la imagen original de esta tarjeta para poder restaurarla después";
 "ui.scan_cards" = "Buscar tarjetas";
 "ui.seamless_poster" = "Póster continuo";
 "ui.select_all" = "Seleccionar todo";
