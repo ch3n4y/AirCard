@@ -3,6 +3,9 @@
 "bold.bold_only" = "Solo texto en negrita (rápido)";
 "bold.both" = "Universal (normal + negrita)";
 "bold.regular_only" = "Solo fuente normal (rápido)";
+"bold.short_bold" = "Negrita";
+"bold.short_both" = "Normal + negrita";
+"bold.short_regular" = "Normal";
 "error.failed_to_inspect_passthm_file" = "No se ha podido analizar el archivo .passthm";
 "error.failed_to_package_theme_for" = "No se ha podido preparar el tema para aplicarlo.";
 "error.no_iphone_connected" = "No hay ningún iPhone conectado.";
@@ -117,7 +120,7 @@
 "ui.flash_language_target" = "Destino e idioma";
 "ui.flash_passcode_theme" = "Aplicar tema de código";
 "ui.flash_skins" = "Aplicar diseños";
-"ui.flash_skins_count" = "Aplicar diseños (%d tarjetas)";
+"ui.flash_skins_count" = "Aplicar diseños (%d)";
 "ui.flash_to_iphone" = "Aplicar en el iPhone";
 "ui.flashing_cards" = "Aplicando tarjetas…";
 "ui.flashing_passcode" = "Aplicando el tema de código…";
@@ -136,7 +139,7 @@
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "En el iPhone, **pulsa dos veces el botón lateral** (Apple Pay), autentícate con **Face ID** y **toca la tarjeta**.";
 "ui.passcode_theme_file" = "Archivo de tema de código";
-"ui.passcode_theme_successfully_applied_n" = "¡Tema de código aplicado!\n\nBloquea el iPhone (o reinícialo) para ver el nuevo teclado del código.";
+"ui.passcode_theme_successfully_applied_n" = "¡Tema de código aplicado!\\n\\nBloquea el iPhone (o reinícialo) para ver el nuevo teclado del código.";
 "ui.passcode_themes" = "Temas de código:";
 "ui.passthm_standard_cowabunga_nugget" = "Estándar .passthm (Cowabunga / Nugget)";
 "ui.paste_one_or_more_card" = "Pega uno o más hashes de tarjeta (separados por espacios, comas o saltos de línea):";
@@ -155,7 +158,7 @@
 "ui.select_all" = "Seleccionar todo";
 "ui.set_skin_for_all" = "Asignar diseño a todas…";
 "ui.skin_assigned_and_ready" = "Diseño asignado y listo";
-"ui.skins_successfully_applied_to_all" = "¡Diseños aplicados a todas las tarjetas seleccionadas!\n\nFuerza el cierre de la app Wallet en el iPhone (o reinícialo) para ver los nuevos diseños.";
+"ui.skins_successfully_applied_to_all" = "¡Diseños aplicados a todas las tarjetas seleccionadas!\\n\\nFuerza el cierre de la app Wallet en el iPhone (o reinícialo) para ver los nuevos diseños.";
 "ui.slice_circle_desc" = "La imagen se recorta en iconos circulares para cada tecla.";
 "ui.slice_seamless_desc" = "La imagen se extiende por todas las teclas sin recortes circulares (estilo Adobe Dog).";
 "ui.slicing_style" = "Estilo de recorte";

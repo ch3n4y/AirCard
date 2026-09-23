@@ -119,13 +119,28 @@ enum PasscodeLanguageTarget: String, CaseIterable, Identifiable {
     
     var id: String { rawValue }
 
-    // Language names stay written the way each language writes itself, so only
-    // the two generic entries need translating.
+    // Each language is named the way it names itself, so a Ukrainian picking
+    // Ukrainian sees the word they would look for. Only the two generic entries
+    // are translated.
     var title: String {
         switch self {
         case .all: return L("lang.all", "All Languages (Universal)")
         case .other: return L("lang.other", "Other / Fallback")
-        default: return rawValue
+        case .uk: return "Українська (uk)"
+        case .ru: return "Русский (ru)"
+        case .en: return "English (en)"
+        case .es: return "Español (es)"
+        case .de: return "Deutsch (de)"
+        case .fr: return "Français (fr)"
+        case .pl: return "Polski (pl)"
+        case .it: return "Italiano (it)"
+        case .pt: return "Português (pt)"
+        case .tr: return "Türkçe (tr)"
+        case .ja: return "日本語 (ja)"
+        case .ko: return "한국어 (ko)"
+        case .zh: return "中文 (zh)"
+        case .ar: return "العربية (ar)"
+        case .he: return "עברית (he)"
         }
     }
 
@@ -163,6 +178,15 @@ enum PasscodeBoldTarget: String, CaseIterable, Identifiable {
         case .both: return L("bold.both", "Universal (Regular + Bold)")
         case .boldOnly: return L("bold.bold_only", "Bold Text Only (Fast)")
         case .regularOnly: return L("bold.regular_only", "Regular Font Only (Fast)")
+        }
+    }
+
+    // .code is the argument the backend takes; it has no business on screen.
+    var shortTitle: String {
+        switch self {
+        case .both: return L("bold.short_both", "Regular + Bold")
+        case .boldOnly: return L("bold.short_bold", "Bold")
+        case .regularOnly: return L("bold.short_regular", "Regular")
         }
     }
     
@@ -3249,7 +3273,7 @@ struct ContentView: View {
                     if vm.selectedTab == .passcodeThemes {
                         if vm.passcodeTabMode == .themeCreator {
                             let count = vm.effectiveCreatorKeys.count
-                            let targetInfo = "\(vm.targetTelephonyVersion) · \(vm.passcodeLanguageTarget.code.uppercased()) · \(vm.passcodeBoldTarget.code)"
+                            let targetInfo = "\(vm.targetTelephonyVersion) · \(vm.passcodeLanguageTarget.code.uppercased()) · \(vm.passcodeBoldTarget.shortTitle)"
                             if count > 0 {
                                 Text(String(format: L("ui.creator_status", "Theme Creator · %1$d of 10 keys configured · Target: %2$@"), count, targetInfo))
                                     .font(.system(size: 10))
@@ -3260,7 +3284,7 @@ struct ContentView: View {
                                     .foregroundColor(.secondary)
                             }
                         } else if let theme = vm.loadedPasscodeTheme {
-                            let targetInfo = "\(vm.targetTelephonyVersion) · \(vm.passcodeLanguageTarget.code.uppercased()) · \(vm.passcodeBoldTarget.code)"
+                            let targetInfo = "\(vm.targetTelephonyVersion) · \(vm.passcodeLanguageTarget.code.uppercased()) · \(vm.passcodeBoldTarget.shortTitle)"
                             Text(String(format: L("ui.theme_status", "%1$d source assets loaded · Target: %2$@"), theme.fileCount, targetInfo))
                                 .font(.system(size: 10))
                                 .foregroundColor(.secondary)
@@ -3346,7 +3370,7 @@ struct ContentView: View {
                                 Image(systemName: "sparkles")
                                     .frame(width: 16, height: 16)
                             }
-                            Text(vm.isFlashing ? L("ui.flashing_cards", "Flashing Cards...") : (readyToFlashCount > 0 ? String(format: L("ui.flash_skins_count", "Flash Skins (%d Cards)"), readyToFlashCount) : L("ui.flash_skins", "Flash Skins")))
+                            Text(vm.isFlashing ? L("ui.flashing_cards", "Flashing Cards...") : (readyToFlashCount > 0 ? String(format: L("ui.flash_skins_count", "Flash Skins (%d)"), readyToFlashCount) : L("ui.flash_skins", "Flash Skins")))
                                 .fontWeight(.semibold)
                         }
                         .padding(.horizontal, 8)

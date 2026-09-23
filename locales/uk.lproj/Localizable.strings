@@ -3,6 +3,9 @@
 "bold.bold_only" = "Лише жирний текст (швидко)";
 "bold.both" = "Універсально (звичайний + жирний)";
 "bold.regular_only" = "Лише звичайний шрифт (швидко)";
+"bold.short_bold" = "Жирний";
+"bold.short_both" = "Звичайний + жирний";
+"bold.short_regular" = "Звичайний";
 "error.failed_to_inspect_passthm_file" = "Не вдалося прочитати файл .passthm";
 "error.failed_to_package_theme_for" = "Не вдалося підготувати тему до запису.";
 "error.no_iphone_connected" = "iPhone не підключено.";
@@ -117,7 +120,7 @@
 "ui.flash_language_target" = "Ціль запису й мова";
 "ui.flash_passcode_theme" = "Записати тему код-пароля";
 "ui.flash_skins" = "Записати оформлення";
-"ui.flash_skins_count" = "Записати оформлення (карток: %d)";
+"ui.flash_skins_count" = "Записати оформлення (%d)";
 "ui.flash_to_iphone" = "Записати на iPhone";
 "ui.flashing_cards" = "Запис карток…";
 "ui.flashing_passcode" = "Запис код-пароля…";
@@ -136,7 +139,7 @@
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "На iPhone **двічі натисніть бічну кнопку** (Apple Pay), пройдіть автентифікацію **Face ID** і **торкніться картки**.";
 "ui.passcode_theme_file" = "Файл теми код-пароля";
-"ui.passcode_theme_successfully_applied_n" = "Тему код-пароля застосовано!\n\nЗаблокуйте iPhone (або перезапустіть його), щоб побачити нову клавіатуру код-пароля.";
+"ui.passcode_theme_successfully_applied_n" = "Тему код-пароля застосовано!\\n\\nЗаблокуйте iPhone (або перезапустіть його), щоб побачити нову клавіатуру код-пароля.";
 "ui.passcode_themes" = "Теми код-пароля:";
 "ui.passthm_standard_cowabunga_nugget" = "Стандарт .passthm (Cowabunga / Nugget)";
 "ui.paste_one_or_more_card" = "Вставте один або кілька хешів карток (через пробіл, кому або з нового рядка):";
@@ -155,7 +158,7 @@
 "ui.select_all" = "Вибрати все";
 "ui.set_skin_for_all" = "Задати оформлення для всіх…";
 "ui.skin_assigned_and_ready" = "Оформлення призначено, усе готово";
-"ui.skins_successfully_applied_to_all" = "Оформлення застосовано до всіх вибраних карток!\n\nПримусово закрийте Wallet на iPhone (або перезапустіть його), щоб побачити новий вигляд.";
+"ui.skins_successfully_applied_to_all" = "Оформлення застосовано до всіх вибраних карток!\\n\\nПримусово закрийте Wallet на iPhone (або перезапустіть його), щоб побачити новий вигляд.";
 "ui.slice_circle_desc" = "Зображення обрізається під круглі іконки кнопок.";
 "ui.slice_seamless_desc" = "Зображення суцільно лягає на всі клавіші без круглих вирізів (як у Adobe Dog).";
 "ui.slicing_style" = "Спосіб нарізки";

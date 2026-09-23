@@ -3,6 +3,9 @@
 "bold.bold_only" = "Bold Text Only (Fast)";
 "bold.both" = "Universal (Regular + Bold)";
 "bold.regular_only" = "Regular Font Only (Fast)";
+"bold.short_bold" = "Bold";
+"bold.short_both" = "Regular + Bold";
+"bold.short_regular" = "Regular";
 "error.failed_to_inspect_passthm_file" = "Failed to inspect .passthm file";
 "error.failed_to_package_theme_for" = "Failed to package theme for flashing.";
 "error.no_iphone_connected" = "No iPhone connected.";
@@ -117,7 +120,7 @@
 "ui.flash_language_target" = "Flash & Language Target";
 "ui.flash_passcode_theme" = "Flash Passcode Theme";
 "ui.flash_skins" = "Flash Skins";
-"ui.flash_skins_count" = "Flash Skins (%d Cards)";
+"ui.flash_skins_count" = "Flash Skins (%d)";
 "ui.flash_to_iphone" = "Flash to iPhone";
 "ui.flashing_cards" = "Flashing Cards...";
 "ui.flashing_passcode" = "Flashing Passcode...";

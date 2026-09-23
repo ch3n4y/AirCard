@@ -3,6 +3,9 @@
 "bold.bold_only" = "Nur fetter Text (schnell)";
 "bold.both" = "Universal (normal + fett)";
 "bold.regular_only" = "Nur normale Schrift (schnell)";
+"bold.short_bold" = "Fett";
+"bold.short_both" = "Normal + Fett";
+"bold.short_regular" = "Normal";
 "error.failed_to_inspect_passthm_file" = ".passthm-Datei konnte nicht gelesen werden";
 "error.failed_to_package_theme_for" = "Design konnte nicht zum Aufspielen gepackt werden.";
 "error.no_iphone_connected" = "Kein iPhone verbunden.";
@@ -117,7 +120,7 @@
 "ui.flash_language_target" = "Aufspielziel & Sprache";
 "ui.flash_passcode_theme" = "Code-Design aufspielen";
 "ui.flash_skins" = "Skins aufspielen";
-"ui.flash_skins_count" = "Skins aufspielen (%d Karten)";
+"ui.flash_skins_count" = "Skins aufspielen (%d)";
 "ui.flash_to_iphone" = "Aufs iPhone aufspielen";
 "ui.flashing_cards" = "Karten werden aufgespielt …";
 "ui.flashing_passcode" = "Code wird aufgespielt …";
@@ -136,7 +139,7 @@
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "Drücke auf deinem iPhone **zweimal die Seitentaste** (Apple Pay), bestätige mit **Face ID** und **tippe auf deine Karte**.";
 "ui.passcode_theme_file" = "Code-Design-Datei";
-"ui.passcode_theme_successfully_applied_n" = "Code-Design erfolgreich angewendet!\n\nSperre dein iPhone (oder starte es neu), um das neue Code-Tastenfeld zu sehen.";
+"ui.passcode_theme_successfully_applied_n" = "Code-Design erfolgreich angewendet!\\n\\nSperre dein iPhone (oder starte es neu), um das neue Code-Tastenfeld zu sehen.";
 "ui.passcode_themes" = "Code-Designs:";
 "ui.passthm_standard_cowabunga_nugget" = ".passthm-Standard (Cowabunga / Nugget)";
 "ui.paste_one_or_more_card" = "Füge einen oder mehrere Karten-Hashes ein (getrennt durch Leerzeichen, Kommas oder Zeilenumbrüche):";
@@ -155,7 +158,7 @@
 "ui.select_all" = "Alle auswählen";
 "ui.set_skin_for_all" = "Skin für alle festlegen …";
 "ui.skin_assigned_and_ready" = "Skin zugewiesen und bereit";
-"ui.skins_successfully_applied_to_all" = "Skins erfolgreich auf alle ausgewählten Karten angewendet!\n\nBeende die Wallet-App auf deinem iPhone vollständig (oder starte das iPhone neu), um die neuen Designs zu sehen.";
+"ui.skins_successfully_applied_to_all" = "Skins erfolgreich auf alle ausgewählten Karten angewendet!\\n\\nBeende die Wallet-App auf deinem iPhone vollständig (oder starte das iPhone neu), um die neuen Designs zu sehen.";
 "ui.slice_circle_desc" = "Die Grafik wird in einzelne runde Tastensymbole geschnitten.";
 "ui.slice_seamless_desc" = "Die Grafik läuft nahtlos über alle Tasten, ohne runde Ausschnitte (Adobe-Dog-Stil).";
 "ui.slicing_style" = "Schnittart";
