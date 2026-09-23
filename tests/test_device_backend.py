@@ -22,10 +22,10 @@ class DeviceBackendTests(unittest.TestCase):
         sample = [
             {"udid": "usb-udid", "name": "Cabled", "product": "iPhone16,1",
              "version": "18.6", "language": "en", "locale": "", "bold_text": None,
-             "connection": "usb"},
+             "connection": "usb", "connected": True},
             {"udid": "wifi-udid", "name": "Remote", "product": "iPhone15,2",
              "version": "18.5", "language": "en", "locale": "", "bold_text": None,
-             "connection": "network"},
+             "connection": "network", "connected": True},
         ]
         with patch.object(aircard_backend, "find_device_helper", return_value="/x/device_helper"), \
                 patch.object(aircard_backend, "list_connected_devices", return_value=sample):

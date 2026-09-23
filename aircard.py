@@ -125,6 +125,9 @@ def _normalize_device(device: dict) -> dict:
         "locale": device.get("locale") or "",
         "bold_text": device.get("bold_text"),
         "connection": device.get("connection") or "unknown",
+        # The app decodes this as a plain Bool, so it has to be here. Anything
+        # that came back from enumeration is reachable by definition.
+        "connected": True,
     }
 
 
