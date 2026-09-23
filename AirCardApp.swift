@@ -937,6 +937,8 @@ class AppViewModel: ObservableObject {
     // quietly on their behalf.
     func backupCard(id: String) {
         guard let udid = device?.udid, !isFlashing else { return }
+        // Clear last time's error, or it outlives the run that caused it.
+        errorMessage = nil
         isFlashing = true
         showLogs = true
         statusText = L("status.backing_up", "Saving original artwork...")
@@ -969,6 +971,7 @@ class AppViewModel: ObservableObject {
             errorMessage = L("error.no_backup_for_card", "There is no saved original for this card, so it cannot be restored.")
             return
         }
+        errorMessage = nil
         isFlashing = true
         showLogs = true
         statusText = L("status.restoring", "Restoring original artwork...")
@@ -1207,6 +1210,7 @@ class AppViewModel: ObservableObject {
         isFlashing = true
         showLogs = true
         progress = 0.0
+        errorMessage = nil
         log("Starting skin application for \(selectedCardsWithSkin.count) card(s)...")
         let scriptDir = self.scriptDir
         
@@ -1421,6 +1425,7 @@ class AppViewModel: ObservableObject {
         isFlashing = true
         showLogs = true
         progress = 0.0
+        errorMessage = nil
         statusText = L("status.starting_passcode_theme_flash", "Starting passcode theme flash...")
         log("Flashing passcode theme '\(theme.name)' to device...")
         let scriptDir = self.scriptDir
@@ -1514,7 +1519,7 @@ class AppViewModel: ObservableObject {
             
             await MainActor.run {
                 self.isFlashing = false
-                if exitCode == 0 && self.errorMessage == nil {
+                if exitCode == 0 {
                     self.progress = 1.0
                     self.statusText = L("status.passcode_theme_applied_successfully", "Passcode theme applied successfully!")
                     self.showSuccessAlert = true
