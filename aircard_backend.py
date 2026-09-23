@@ -54,16 +54,17 @@ from card_assets import CACHE_FILES, build_card_assets
 from aircard import (
     find_device_helper,
     get_connected_device,
+    list_connected_devices,
     load_saved_cards,
     save_cards,
 )
 
 
-def cmd_device():
+def cmd_device(preferred_udid: str | None = None):
     if not find_device_helper():
         print(json.dumps({"connected": False, "error": "device_helper_missing"}))
         return
-    device = get_connected_device()
+    device = get_connected_device(preferred_udid)
     if not device:
         print(json.dumps({"connected": False, "error": "no_device"}))
         return
@@ -71,6 +72,20 @@ def cmd_device():
     device["airlift_compatible"] = operation_ok(probe)
     device["connected"] = True
     print(json.dumps(device))
+
+
+def cmd_devices():
+    """Lists every connected device so the app can offer a device picker.
+
+    The airlift probe is intentionally skipped here — probing opens a session on
+    each device and is only needed for whichever one the user selects, which the
+    app fetches with a follow-up `--device <udid>` call.
+    """
+    if not find_device_helper():
+        print(json.dumps({"connected": False, "error": "device_helper_missing", "devices": []}))
+        return
+    devices = list_connected_devices()
+    print(json.dumps({"connected": bool(devices), "devices": devices}))
 
 
 def cmd_get_saved_cards():
@@ -568,7 +583,9 @@ def main():
     cmd = sys.argv[1]
     norm_cmd = cmd.lstrip("-")
     if norm_cmd == "device":
-        cmd_device()
+        cmd_device(sys.argv[2] if len(sys.argv) > 2 else None)
+    elif norm_cmd == "devices":
+        cmd_devices()
     elif norm_cmd == "cards":
         cmd_get_saved_cards()
     elif norm_cmd == "save-cards" and len(sys.argv) > 2:

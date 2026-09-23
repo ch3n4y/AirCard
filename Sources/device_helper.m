@@ -29,6 +29,7 @@ extern int AMDeviceNotificationSubscribeWithOptions(
     CFDictionaryRef options);
 extern int AMDeviceNotificationUnsubscribe(AMDeviceNotificationRef subscription);
 extern CFStringRef AMDeviceCopyDeviceIdentifier(AMDeviceRef device);
+extern int AMDeviceGetInterfaceType(AMDeviceRef device);
 extern CFTypeRef AMDeviceCopyValue(AMDeviceRef device,
                                    CFStringRef domain,
                                    CFStringRef key);
@@ -190,6 +191,12 @@ static void EnumerateCallback(AMDeviceNotificationCallbackInfo *info,
     }
 
     NSMutableDictionary *entry = [@{@"udid": udid} mutableCopy];
+    // Tag the link type so the app can prefer the cabled phone and label the rest.
+    switch (AMDeviceGetInterfaceType(info->device)) {
+        case 1: entry[@"connection"] = @"usb"; break;
+        case 2: entry[@"connection"] = @"network"; break;
+        default: entry[@"connection"] = @"unknown"; break;
+    }
     if (AMDeviceConnect(info->device) == 0) {
         if (!AMDeviceIsPaired(info->device)) AMDevicePair(info->device);
         if (AMDeviceValidatePairing(info->device) == 0 &&
@@ -229,13 +236,16 @@ static void EnumerateCallback(AMDeviceNotificationCallbackInfo *info,
 static int ListDevices(void) {
     DiscoveredDevices = [NSMutableArray array];
     AMDeviceNotificationRef subscription = NULL;
+    // Same scope FindTarget uses, so the list holds every phone scan and flash can
+    // actually reach. Listing less means the right phone is missing with no way to
+    // pick it. Dead pairings fail AMDeviceConnect and get dropped downstream.
     int status = AMDeviceNotificationSubscribeWithOptions(
         EnumerateCallback,
         0,
         0,
         NULL,
         &subscription,
-        (__bridge CFDictionaryRef)SubscriptionOptions(YES));
+        (__bridge CFDictionaryRef)SubscriptionOptions(NO));
     if (status == 0)
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 2.0, false);
     if (subscription) AMDeviceNotificationUnsubscribe(subscription);

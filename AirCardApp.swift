@@ -13,7 +13,14 @@ struct DeviceInfo: Codable {
     var locale: String?
     var bold_text: Bool?
     var airlift_compatible: Bool?
+    var connection: String?
     var connected: Bool
+    var error: String?
+}
+
+struct DeviceListResponse: Codable {
+    var connected: Bool
+    var devices: [DeviceInfo]?
     var error: String?
 }
 
@@ -483,6 +490,7 @@ class AppViewModel: ObservableObject {
     @Published var selectedKeyDigit: String? = nil
     
     @Published var device: DeviceInfo?
+    @Published var devices: [DeviceInfo] = []
     @Published var isCheckingDevice = false
     @Published var isScanningCards = false
     @Published var cards: [CardItem] = []
@@ -585,6 +593,27 @@ class AppViewModel: ObservableObject {
         return env
     }
     
+    // Runs a backend command and hands back its stdout, or nil if it never launched.
+    nonisolated private static func runBackend(_ arguments: [String], scriptDir: String) -> Data? {
+        let process = Process()
+        process.executableURL = pythonExecutableURL
+        process.environment = processEnvironment
+        process.currentDirectoryURL = URL(fileURLWithPath: scriptDir)
+        process.arguments = arguments
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return data
+        } catch {
+            return nil
+        }
+    }
+
     nonisolated static func prepareCardImage(srcURL: URL, dstURL: URL) -> Bool {
         guard let image = NSImage(contentsOf: srcURL) else { return false }
         let targetSize = CGSize(width: 1536, height: 969)
@@ -722,48 +751,81 @@ class AppViewModel: ObservableObject {
         isCheckingDevice = true
         statusText = "Checking connected devices..."
         let scriptDir = self.scriptDir
-        
+
         Task.detached {
-            let process = Process()
-            process.executableURL = AppViewModel.pythonExecutableURL
-            process.environment = AppViewModel.processEnvironment
-            process.currentDirectoryURL = URL(fileURLWithPath: scriptDir)
-            process.arguments = ["aircard_backend.py", "--device"]
-            
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-            
-            do {
-                try process.run()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                
-                if let dev = try? JSONDecoder().decode(DeviceInfo.self, from: data) {
-                    await MainActor.run {
-                        self.device = dev
-                        self.isCheckingDevice = false
-                        if dev.connected {
-                            self.statusText = "Connected to \(dev.name ?? "iPhone")"
-                            self.log("Device connected: \(dev.name ?? "iPhone") (\(dev.product ?? ""), iOS \(dev.version ?? ""))")
-                            self.applyDevicePreferences(from: dev)
-                        } else if dev.error == "device_helper_missing" {
-                            self.statusText = "Device tools are missing from this build."
-                            self.log("Bundled device_helper not found — detection cannot run.")
-                        } else {
-                            self.statusText = "No iPhone found. Please connect via USB."
-                        }
-                    }
-                } else {
-                    await MainActor.run {
-                        self.isCheckingDevice = false
+            let data = AppViewModel.runBackend(["aircard_backend.py", "--devices"], scriptDir: scriptDir)
+            let response = data.flatMap { try? JSONDecoder().decode(DeviceListResponse.self, from: $0) }
+
+            await MainActor.run {
+                let list = response?.devices ?? []
+                self.devices = list
+
+                guard !list.isEmpty else {
+                    self.device = nil
+                    self.isCheckingDevice = false
+                    if response?.error == "device_helper_missing" {
+                        self.statusText = "Device tools are missing from this build."
+                        self.log("Bundled device_helper not found — detection cannot run.")
+                    } else {
                         self.statusText = "No iPhone found. Please connect via USB."
                     }
+                    return
                 }
-            } catch {
-                await MainActor.run {
-                    self.isCheckingDevice = false
-                    self.statusText = "Device detection failed: \(error.localizedDescription)"
+
+                // Stay on the current device if it is still attached, otherwise take
+                // the top of the list (cabled iPhone leads).
+                let keep = self.device?.udid
+                let target = list.first(where: { $0.udid == keep })?.udid ?? list.first?.udid
+                if list.count > 1 {
+                    let name = list.first(where: { $0.udid == target })?.name ?? "iPhone"
+                    self.log("\(list.count) devices connected — using \(name). Switch from the device menu if this is the wrong one.")
+                }
+                self.selectDevice(target, isInitial: true)
+            }
+        }
+    }
+
+    // Switches the active device and re-reads its preferences and airlift status.
+    func selectDevice(_ udid: String?, isInitial: Bool = false) {
+        guard let udid = udid else {
+            isCheckingDevice = false
+            return
+        }
+        if !isInitial && device?.udid == udid { return }
+
+        // Changing phones: stop the scan and drop the old phone's hashes so they
+        // cannot be flashed onto the new one. Keyed on the device actually changing,
+        // so a refresh that falls back to another phone clears them too. Nothing to
+        // clear on first launch, which keeps the restored saved cards.
+        if let current = device?.udid, current != udid {
+            if isScanningCards { stopCardScanning() }
+            cards.removeAll()
+        }
+
+        isCheckingDevice = true
+        let scriptDir = self.scriptDir
+
+        Task.detached {
+            let data = AppViewModel.runBackend(["aircard_backend.py", "--device", udid], scriptDir: scriptDir)
+            let dev = data.flatMap { try? JSONDecoder().decode(DeviceInfo.self, from: $0) }
+
+            await MainActor.run {
+                self.isCheckingDevice = false
+                // Only accept the exact device we asked for. A substituted one would
+                // silently point scan and flash at the wrong iPhone.
+                if let dev = dev, dev.connected, dev.udid == udid {
+                    self.device = dev
+                    self.statusText = "Connected to \(dev.name ?? "iPhone")"
+                    self.log("Device \(isInitial ? "connected" : "selected"): \(dev.name ?? "iPhone") (\(dev.product ?? ""), iOS \(dev.version ?? ""))")
+                    self.applyDevicePreferences(from: dev)
+                } else {
+                    self.device = nil
+                    if isInitial {
+                        self.statusText = "No iPhone found. Please connect via USB."
+                    } else {
+                        self.statusText = "Selected iPhone is no longer connected."
+                        self.log("Selected device is no longer available — reconnect it and refresh.")
+                    }
                 }
             }
         }
@@ -1855,7 +1917,35 @@ struct ContentView: View {
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
-                
+
+                if vm.devices.count > 1 {
+                    Menu {
+                        ForEach(vm.devices, id: \.udid) { d in
+                            Button {
+                                if let udid = d.udid { vm.selectDevice(udid) }
+                            } label: {
+                                let tag = d.connection == "usb" ? "USB"
+                                    : (d.connection == "network" ? "Wi-Fi" : "")
+                                let label = tag.isEmpty
+                                    ? (d.name ?? "iPhone")
+                                    : "\(d.name ?? "iPhone") (\(tag))"
+                                if d.udid == vm.device?.udid {
+                                    Label(label, systemImage: "checkmark")
+                                } else {
+                                    Text(label)
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 10))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .disabled(vm.isCheckingDevice || vm.isScanningCards || vm.isFlashing)
+                    .help("Switch device (\(vm.devices.count) connected)")
+                }
+
                 Button(action: { vm.checkDevice() }) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11))
