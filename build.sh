@@ -99,7 +99,35 @@ chmod +x "${MACOS_DIR}/AirCard"
 echo "==> [5/6] Setting permissions and signing ${APP_NAME}.app bundle..."
 chmod -R 755 "$APP_DIR"
 xattr -cr "$APP_DIR" 2>/dev/null || true
-codesign --force --deep --sign - "$APP_DIR"
+# Ad-hoc by default so anyone can build this. Set CODESIGN_IDENTITY to a
+# Developer ID to ship a build that Gatekeeper will accept after notarising.
+CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
+if [ "$CODESIGN_IDENTITY" = "-" ]; then
+    codesign --force --deep --sign - "$APP_DIR"
+else
+    # Sign inside out. --deep only walks Frameworks and PlugIns, so the helpers
+    # in Resources/bin keep whatever signature they arrived with, and the notary
+    # service rejects the whole bundle over one ad-hoc binary inside it.
+    # Hardened runtime is required before anything can be notarised.
+    for tool in "${BIN_DIR}"/*; do
+        [ -f "$tool" ] || continue
+        codesign --force --options runtime --timestamp \
+            --sign "$CODESIGN_IDENTITY" "$tool"
+    done
+    codesign --force --options runtime --timestamp \
+        --sign "$CODESIGN_IDENTITY" "$APP_DIR"
+    codesign --verify --strict --verbose=1 "$APP_DIR"
+    # Catch an ad-hoc straggler here rather than in a notary rejection. Checking
+    # the bundle alone is not enough: codesign reports the top-level signature
+    # only, and the binaries this is guarding are nested inside Resources.
+    for nested in "$APP_DIR/Contents/MacOS"/* "$BIN_DIR"/*; do
+        [ -f "$nested" ] || continue
+        if codesign -dv "$nested" 2>&1 | grep -q "adhoc"; then
+            echo "ERROR: $nested is still ad-hoc signed" >&2
+            exit 1
+        fi
+    done
+fi
 
 echo "==> [6/6] Generating styled DMG (${APP_NAME}.dmg)..."
 DMG_STAGING="/tmp/aircard_dmg_staging"
@@ -129,6 +157,17 @@ else
     hdiutil create -volname "AirCard" -srcfolder "$DMG_STAGING" -ov -format UDZO "build/${APP_NAME}.dmg"
 fi
 
+# Sign the disk image too, otherwise the signature stops at the app inside it.
+if [ "$CODESIGN_IDENTITY" != "-" ]; then
+    codesign --force --sign "$CODESIGN_IDENTITY" --timestamp "build/${APP_NAME}.dmg"
+fi
+
 echo "============================================================"
 echo "🎉 SUCCESS: build/${APP_NAME}.dmg is ready!"
+if [ "$CODESIGN_IDENTITY" != "-" ]; then
+    echo "   Signed with: $CODESIGN_IDENTITY"
+    echo "   Notarise with: xcrun notarytool submit build/${APP_NAME}.dmg \\"
+    echo "                    --keychain-profile <profile> --wait"
+    echo "   Then staple:   xcrun stapler staple build/${APP_NAME}.dmg"
+fi
 echo "============================================================"
