@@ -28,6 +28,19 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
 <dict>
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>zh-Hans</string>
+        <string>zh-Hant</string>
+        <string>ja</string>
+        <string>ko</string>
+        <string>uk</string>
+        <string>ru</string>
+        <string>es</string>
+        <string>de</string>
+        <string>fr</string>
+    </array>
     <key>CFBundleExecutable</key>
     <string>AirCard</string>
     <key>CFBundleIdentifier</key>
@@ -73,6 +86,22 @@ cp apply_card_skin.py "$RESOURCES_DIR/"
 cp aircard.py "$RESOURCES_DIR/"
 cp aircard_backend.py "$RESOURCES_DIR/"
 cp card_assets.py "$RESOURCES_DIR/"
+
+# UI translations. Adding a language means dropping a new locales/<lang>.lproj
+# in and adding it here, nothing in the Swift changes.
+LANGS=(en zh-Hans zh-Hant ja ko uk ru es de fr)
+for lang in "${LANGS[@]}"; do
+    strings_file="locales/${lang}.lproj/Localizable.strings"
+    if [ ! -f "$strings_file" ]; then
+        echo "ERROR: missing $strings_file" >&2
+        exit 1
+    fi
+    # A malformed .strings loads empty at runtime and silently falls back to
+    # English, so refuse to ship one.
+    plutil -lint "$strings_file" >/dev/null || { echo "ERROR: $strings_file is malformed" >&2; exit 1; }
+    mkdir -p "${RESOURCES_DIR}/${lang}.lproj"
+    cp "$strings_file" "${RESOURCES_DIR}/${lang}.lproj/Localizable.strings"
+done
 
 # A bundle without these cannot talk to a device at all, so fail here instead
 # of shipping an app that reports "No iPhone found" for every user.
