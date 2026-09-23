@@ -8,6 +8,13 @@ func L(_ key: String, _ fallback: String) -> String {
     Bundle.main.localizedString(forKey: key, value: fallback, table: nil)
 }
 
+// Same lookup, for the few strings that carry ** ** emphasis. Text(String) does
+// not render markdown, so those would otherwise show the asterisks themselves.
+func LM(_ key: String, _ fallback: String) -> AttributedString {
+    let text = L(key, fallback)
+    return (try? AttributedString(markdown: text)) ?? AttributedString(text)
+}
+
 // MARK: - Models
 
 struct DeviceInfo: Codable {
@@ -1058,7 +1065,9 @@ class AppViewModel: ObservableObject {
         scanProcess = nil
         if let process, process.isRunning { process.terminate() }
         isScanningCards = false
-        if statusText.contains("Double-click Side button") {
+        // Compare against the same lookup, not the English wording, or this never
+        // matches once the app is running in another language.
+        if statusText == L("status.double_click_side_button_pass", "Double-click Side button, pass Face ID, then tap your card...") {
             statusText = L("status.ready", "Ready")
         }
         saveCards()
@@ -1891,7 +1900,7 @@ struct ContentView: View {
             if newTab == .passcodeThemes && vm.isScanningCards {
                 vm.stopCardScanning()
             }
-            if vm.statusText.contains("Double-click Side button") {
+            if vm.statusText == L("status.double_click_side_button_pass", "Double-click Side button, pass Face ID, then tap your card...") {
                 vm.statusText = L("status.ready", "Ready")
             }
         }
@@ -2127,13 +2136,13 @@ struct ContentView: View {
                     Text("1.")
                         .fontWeight(.bold)
                         .foregroundColor(.accentColor)
-                    Text(L("ui.click_scan_cards_in_the", "Click **Scan Cards** in the toolbar above."))
+                    Text(LM("ui.click_scan_cards_in_the", "Click **Scan Cards** in the toolbar above."))
                 }
                 HStack(alignment: .top, spacing: 10) {
                     Text("2.")
                         .fontWeight(.bold)
                         .foregroundColor(.accentColor)
-                    Text(L("ui.on_your_iphone_double_click", "On your iPhone, **double-click the Side button** (Apple Pay), authenticate with **Face ID**, and **tap your card**."))
+                    Text(LM("ui.on_your_iphone_double_click", "On your iPhone, **double-click the Side button** (Apple Pay), authenticate with **Face ID**, and **tap your card**."))
                 }
                 HStack(alignment: .top, spacing: 10) {
                     Text("3.")
