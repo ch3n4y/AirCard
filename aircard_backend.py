@@ -57,6 +57,7 @@ from aircard import (
     get_connected_device,
     has_card_backup,
     list_backed_up_cards,
+    BACKED_UP_ASSETS,
     list_connected_devices,
     load_saved_cards,
     read_card_backup,
@@ -113,7 +114,7 @@ def cmd_backup(udid: str, card_hash: str) -> bool:
 
     pkpass_dir = f"/var/mobile/Library/Passes/Cards/{card_hash}.pkpass"
     originals = []
-    for asset in TARGET_ASSETS:
+    for asset in BACKED_UP_ASSETS:
         try:
             data = read_file(udid, pkpass_dir, asset)
         except Exception:

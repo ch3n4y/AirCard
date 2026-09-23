@@ -13,6 +13,21 @@ CARD = "M6nDwZrkYbFlsodLgCbvyFZQ1cc="
 UDID = "00008150-001405803C47801C"
 
 
+class BackupCoverageTests(unittest.TestCase):
+    def test_backup_covers_every_file_a_flash_writes(self):
+        """A file left behind puts the skin straight back on a restored card."""
+        import card_assets
+        written = {name for name, _ in [
+            *[(n, b"") for n in card_assets.PNG_ASSET_NAMES],
+            (card_assets.PDF_ASSET_NAME, b""),
+        ]}
+        missing = written - set(aircard.BACKED_UP_ASSETS)
+        self.assertEqual(
+            missing, set(),
+            f"a flash writes {sorted(missing)} but backup/restore does not cover it",
+        )
+
+
 class BackupStorageTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

@@ -43,6 +43,12 @@ TARGET_ASSETS = [
     "cardBackgroundCombined@2x.png",
 ]
 
+# Everything a flash overwrites, which is what a backup has to cover. Taken from
+# card_assets so the two cannot drift apart: leaving the PDF behind would put the
+# skin straight back on a card the user just restored.
+from card_assets import PNG_ASSET_NAMES, PDF_ASSET_NAME
+BACKED_UP_ASSETS = [*PNG_ASSET_NAMES, PDF_ASSET_NAME]
+
 CACHE_FILES = ["FrontFace", "Preview"]
 
 CARDS_STORE_PATH = Path.home() / ".aircard_cards.json"
