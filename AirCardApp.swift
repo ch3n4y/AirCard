@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import CryptoKit
 
 // MARK: - Models
 
@@ -20,8 +21,17 @@ struct DeviceInfo: Codable {
 struct CardItem: Identifiable, Hashable {
     let id: String
     var isSelected: Bool = true
-    var customImageURL: URL? = nil
+    var customImageURL: URL? = nil {
+        didSet { skinSignature = customImageURL.flatMap(CardItem.signature(of:)) }
+    }
     var customImage: NSImage? = nil
+    /// SHA-256 of the assigned skin file; used to skip cards whose skin is already on the device.
+    private(set) var skinSignature: String? = nil
+    
+    static func signature(of url: URL) -> String? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
     
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
@@ -501,6 +511,9 @@ class AppViewModel: ObservableObject {
     private var scanProcess: Process?
     private let scriptDir: String
     private let storageKey = "mak5er.aircard.savedCards"
+    private let flashedSkinsKey = "mak5er.aircard.flashedSkins"
+    /// "udid|cardHash" -> skin signature last flashed successfully.
+    @Published var flashedSkins: [String: String] = [:]
     private let legacyStorageKey1 = "mak5er.savedCards"
     private let legacyStorageKey2 = "LumiCards.savedCards"
     
@@ -520,6 +533,7 @@ class AppViewModel: ObservableObject {
             self.scriptDir = Bundle.main.bundleURL.deletingLastPathComponent().path
         }
         
+        flashedSkins = UserDefaults.standard.dictionary(forKey: flashedSkinsKey) as? [String: String] ?? [:]
         loadSavedCards()
         checkDevice()
     }
@@ -719,6 +733,25 @@ class AppViewModel: ObservableObject {
             cards[idx].customImage = nil
             log("Cleared custom skin for: \(cardId.prefix(12))...")
         }
+    }
+    
+    private func flashedKey(udid: String, cardId: String) -> String { "\(udid)|\(cardId)" }
+    
+    /// True when the card's current skin is already on the connected device.
+    func isSkinFlashed(_ card: CardItem) -> Bool {
+        guard let udid = device?.udid, let sig = card.skinSignature else { return false }
+        return flashedSkins[flashedKey(udid: udid, cardId: card.id)] == sig
+    }
+    
+    /// Selected cards with a skin that differs from what was last flashed.
+    var cardsNeedingFlash: [CardItem] {
+        cards.filter { $0.isSelected && $0.customImageURL != nil && !isSkinFlashed($0) }
+    }
+    
+    private func markSkinFlashed(udid: String, card: CardItem) {
+        guard let sig = card.skinSignature else { return }
+        flashedSkins[flashedKey(udid: udid, cardId: card.id)] = sig
+        UserDefaults.standard.set(flashedSkins, forKey: flashedSkinsKey)
     }
     
     // MARK: - Device Connection
@@ -979,16 +1012,23 @@ class AppViewModel: ObservableObject {
             errorMessage = "No iPhone connected."
             return
         }
-        let selectedCardsWithSkin = cards.filter { $0.isSelected && $0.customImageURL != nil }
-        guard !selectedCardsWithSkin.isEmpty else {
+        let allSkinned = cards.filter { $0.isSelected && $0.customImageURL != nil }
+        guard !allSkinned.isEmpty else {
             errorMessage = "Please assign a skin image to at least one selected card."
             return
         }
+        // Only flash changed skins; if nothing changed, re-flash everything selected.
+        let changed = cardsNeedingFlash
+        let selectedCardsWithSkin = changed.isEmpty ? allSkinned : changed
         
         isFlashing = true
         showLogs = true
         progress = 0.0
-        log("Starting skin application for \(selectedCardsWithSkin.count) card(s)...")
+        if changed.isEmpty {
+            log("No changed skins; re-flashing all \(allSkinned.count) selected card(s)...")
+        } else {
+            log("Starting skin application for \(changed.count) changed card(s); skipping \(allSkinned.count - changed.count) already flashed.")
+        }
         let scriptDir = self.scriptDir
         
         Task.detached {
@@ -1134,6 +1174,7 @@ class AppViewModel: ObservableObject {
                 }
                 
                 await MainActor.run {
+                    self.markSkinFlashed(udid: udid, card: card)
                     self.progress = Double(idx + 1) / totalCards
                 }
             }
@@ -1476,6 +1517,7 @@ class AppViewModel: ObservableObject {
 struct WalletCardView: View {
     @Binding var card: CardItem
     let cardIndex: Int
+    var isFlashed: Bool = false
     let onPickImage: () -> Void
     let onClearImage: () -> Void
     let onDelete: () -> Void
@@ -1681,10 +1723,10 @@ struct WalletCardView: View {
                 
                 // Status badge
                 if card.customImage != nil {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                    Image(systemName: isFlashed ? "checkmark.circle.fill" : "arrow.up.circle.fill")
+                        .foregroundColor(isFlashed ? .green : .orange)
                         .font(.system(size: 12))
-                        .help("Skin assigned and ready")
+                        .help(isFlashed ? "Skin already on iPhone" : "Skin changed, will be flashed")
                 }
                 
                 // Delete button
@@ -1723,6 +1765,8 @@ struct ContentView: View {
     private var readyToFlashCount: Int {
         vm.cards.filter { $0.isSelected && $0.customImageURL != nil }.count
     }
+    
+    private var changedCount: Int { vm.cardsNeedingFlash.count }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -1770,6 +1814,7 @@ struct ContentView: View {
                                 WalletCardView(
                                     card: $vm.cards[idx],
                                     cardIndex: idx,
+                                    isFlashed: vm.isSkinFlashed(vm.cards[idx]),
                                     onPickImage: { openCardImagePicker(for: vm.cards[idx].id) },
                                     onClearImage: { vm.clearCardImage(for: vm.cards[idx].id) },
                                     onDelete: { vm.deleteCard(id: vm.cards[idx].id) }
@@ -3169,7 +3214,7 @@ struct ContentView: View {
                                 .foregroundColor(.secondary)
                         }
                     } else if !vm.cards.isEmpty {
-                        Text("\(vm.cards.filter { $0.isSelected }.count) of \(vm.cards.count) cards selected · \(readyToFlashCount) ready to flash")
+                        Text("\(vm.cards.filter { $0.isSelected }.count) of \(vm.cards.count) cards selected · \(changedCount) changed · \(readyToFlashCount - changedCount) already on iPhone")
                             .font(.system(size: 10))
                             .foregroundColor(.secondary)
                     }
@@ -3245,7 +3290,7 @@ struct ContentView: View {
                                 Image(systemName: "sparkles")
                                     .frame(width: 16, height: 16)
                             }
-                            Text(vm.isFlashing ? "Flashing Cards..." : (readyToFlashCount > 0 ? "Flash Skins (\(readyToFlashCount) Cards)" : "Flash Skins"))
+                            Text(vm.isFlashing ? "Flashing Cards..." : (changedCount > 0 ? "Flash Skins (\(changedCount) Changed)" : (readyToFlashCount > 0 ? "Re-flash All (\(readyToFlashCount))" : "Flash Skins")))
                                 .fontWeight(.semibold)
                         }
                         .padding(.horizontal, 8)
