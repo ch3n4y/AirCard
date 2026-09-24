@@ -47,7 +47,7 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
     <key>CFBundleVersion</key>
     <string>7</string>
     <key>LSMinimumSystemVersion</key>
-    <string>12.0</string>
+    <string>14.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSPrincipalClass</key>
@@ -100,6 +100,17 @@ echo "==> [5/6] Setting permissions and signing ${APP_NAME}.app bundle..."
 chmod -R 755 "$APP_DIR"
 xattr -cr "$APP_DIR" 2>/dev/null || true
 codesign --force --deep --sign - "$APP_DIR"
+
+# The plist promise is only worth anything if the binaries agree with it. A
+# helper built without a minimum silently inherits the build machine's macOS.
+for binary in "${MACOS_DIR}/${APP_NAME}" "${BIN_DIR}"/*; do
+    [ -f "$binary" ] || continue
+    actual="$(otool -l "$binary" | awk '/minos/ {print $2; exit}')"
+    if [ -n "$actual" ] && [ "$actual" != "14.0" ]; then
+        echo "ERROR: $(basename "$binary") targets macOS $actual, but the app claims 14.0" >&2
+        exit 1
+    fi
+done
 
 echo "==> [6/6] Generating styled DMG (${APP_NAME}.dmg)..."
 DMG_STAGING="/tmp/aircard_dmg_staging"
