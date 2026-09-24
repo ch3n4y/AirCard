@@ -760,9 +760,15 @@ class AppViewModel: ObservableObject {
                         }
                     }
                 } else {
+                    // Nothing parseable came back, which means the backend did not
+                    // run, not that the cable is loose. Saying "no iPhone" here
+                    // sends people to replug a phone that was never the problem.
+                    let raw = String(data: data, encoding: .utf8) ?? ""
                     await MainActor.run {
                         self.isCheckingDevice = false
-                        self.statusText = "No iPhone found. Please connect via USB."
+                        self.statusText = "Device detection could not run. See the log."
+                        self.errorMessage = "AirCard could not run its device tools. The app may be damaged or incompletely installed."
+                        self.log("Device detection returned nothing usable: \(raw.isEmpty ? "(no output)" : raw.prefix(400).description)")
                     }
                 }
             } catch {
@@ -1289,7 +1295,7 @@ class AppViewModel: ObservableObject {
             
             await MainActor.run {
                 self.isFlashing = false
-                if exitCode == 0 && self.errorMessage == nil {
+                if exitCode == 0 {
                     self.progress = 1.0
                     self.statusText = "Passcode theme applied successfully!"
                     self.showSuccessAlert = true
@@ -1773,6 +1779,14 @@ struct ContentView: View {
                 .background(Color(NSColor.controlBackgroundColor))
         }
         .frame(minWidth: 880, minHeight: 680)
+        .alert("Something went wrong", isPresented: Binding(
+            get: { vm.errorMessage != nil },
+            set: { if !$0 { vm.errorMessage = nil } }
+        )) {
+            Button("OK") { vm.errorMessage = nil }
+        } message: {
+            Text(vm.errorMessage ?? "")
+        }
         .alert("Success!", isPresented: $vm.showSuccessAlert) {
             Button("OK") {}
         } message: {
