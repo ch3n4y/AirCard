@@ -997,8 +997,16 @@ class AppViewModel: ObservableObject {
             for (idx, card) in selectedCardsWithSkin.enumerated() {
                 guard let imgURL = card.customImageURL else { continue }
                 
-                let preparedPath = "/tmp/aircard_prep_\(idx).png"
-                
+                // A fresh directory per run. The old fixed /tmp path was shared
+                // between runs, so a card whose artwork failed to prepare would
+                // be flashed with whatever the previous run had left behind.
+                let prepDir = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("aircard-prep-\(UUID().uuidString)")
+                try? FileManager.default.createDirectory(at: prepDir, withIntermediateDirectories: true)
+                let preparedURL = prepDir.appendingPathComponent("card.png")
+                let preparedPath = preparedURL.path
+                defer { try? FileManager.default.removeItem(at: prepDir) }
+
                 await MainActor.run {
                     self.statusText = "[\(idx + 1)/\(selectedCardsWithSkin.count)] Preparing skin for \(card.id.prefix(10))..."
                     self.progress = (Double(idx) + 0.05) / totalCards
@@ -1006,7 +1014,6 @@ class AppViewModel: ObservableObject {
                 }
                 
                 // 1. Prepare image natively in Swift (0 external dependencies!)
-                let preparedURL = URL(fileURLWithPath: preparedPath)
                 let prepped = AppViewModel.prepareCardImage(srcURL: imgURL, dstURL: preparedURL)
                 if !prepped {
                     let prepProcess = Process()
@@ -1016,6 +1023,20 @@ class AppViewModel: ObservableObject {
                     prepProcess.arguments = ["aircard_backend.py", "--prepare-image", imgURL.path, preparedPath]
                     try? prepProcess.run()
                     prepProcess.waitUntilExit()
+                }
+
+                // Neither path reports back, so check the file itself. Flashing
+                // without this writes stale or missing artwork and still calls it
+                // a success.
+                let preparedSize = (try? FileManager.default.attributesOfItem(atPath: preparedPath)[.size] as? Int) ?? nil
+                guard (preparedSize ?? 0) > 0 else {
+                    flashFailed = true
+                    let name = imgURL.lastPathComponent
+                    await MainActor.run {
+                        self.log("Could not prepare artwork from \(name); skipping this card.")
+                        self.errorMessage = "AirCard could not read the image you picked for one of the cards. That card was left unchanged."
+                    }
+                    continue
                 }
                 
                 // 2. Flash card
