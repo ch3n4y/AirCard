@@ -582,6 +582,11 @@ class AppViewModel: ObservableObject {
         }
         let curDyld = env["DYLD_LIBRARY_PATH"] ?? ""
         env["DYLD_LIBRARY_PATH"] = (libPaths + (curDyld.isEmpty ? [] : [curDyld])).joined(separator: ":")
+
+        // The backend scripts live inside the signed bundle. Left to itself
+        // Python drops __pycache__ next to them on first run, which breaks the
+        // app's own signature.
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
         return env
     }
     
