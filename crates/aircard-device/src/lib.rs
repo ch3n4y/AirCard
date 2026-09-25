@@ -1,19 +1,19 @@
 //! Talking to an iPhone.
 //!
-//! Only the part that needs no device is here so far: deciding which log lines
-//! name a card. That is the whole discovery mechanism, because a card's files sit
-//! outside everything AFC will reach.
+//! Three jobs, in the order the app needs them:
 //!
-//! Still to come, in order:
+//! 1. [`hash`] decides which log lines name a Wallet card. That is the whole
+//!    discovery mechanism: a card's files sit outside everything AFC will reach,
+//!    so the only announcement that a card exists is iOS logging its path when
+//!    Wallet renders it.
+//! 2. [`AfcSession`] reaches `Media` -- for the card list, for the sync ledger,
+//!    and for everything the app saves on the phone's behalf.
+//! 3. [`airlift`] is the escape: the only way to touch a card's own files, which
+//!    AFC cannot list, refuses to climb to, and will not let a symlink point at.
 //!
-//! 1. transport: discovery, pairing and AFC, over `MobileDevice.framework` on
-//!    macOS so the app keeps needing nothing installed.
-//! 2. the escape itself: `AirTrafficHost`'s `ATHostConnection*` on macOS, which is
-//!    the only way to move a file across the `Media` boundary -- AFC cannot list
-//!    the card directory, refuses `..`, and does not support `MAKE_LINK` at all.
-//! 3. staged commands, one per operation, each of which must clean up after itself
-//!    even when it is interrupted. The ported implementation leaked staging
-//!    directories on the phone when a run was cut short.
+//! Nothing here needs anything installed. The frameworks are private and already
+//! on the Mac, and they are opened at run time, so a Mac without them gets a
+//! clear error instead of a build that cannot start.
 
 pub mod airlift;
 pub mod hash;
@@ -26,3 +26,8 @@ pub use hash::{hashes_in, is_rejected, is_wallet_line, PLACEHOLDER_HASHES};
 /// clear "not supported" error, which the window shows as such instead of
 /// claiming no phone is plugged in.
 pub use aircard_apple_ffi::{list_devices, AfcSession, DeviceError, DeviceInfo, LogStream};
+
+pub use airlift::{
+    card_cache_directories, card_directory, Airlift, AirliftError, ArchiveUpload, AssetMover,
+    Device, Kind, Leftover, Media, MediaSource, ReadBack,
+};
