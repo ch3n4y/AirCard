@@ -98,6 +98,8 @@
 "ui.circle_buttons" = "Boutons ronds";
 "ui.clear" = "Effacer";
 "ui.clear_all" = "Tout effacer";
+"ui.clear_all_confirm_help" = "Les visuels originaux enregistrés restent sur ce Mac ; une carte pourra être restaurée après avoir été rajoutée.";
+"ui.clear_all_confirm_title" = "Retirer toutes les cartes de cette liste ?";
 "ui.clear_all_keys" = "Effacer toutes les touches";
 "ui.clear_key" = "Effacer la touche %@";
 "ui.clear_scan_record" = "Effacer le résultat du scan";

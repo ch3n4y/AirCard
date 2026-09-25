@@ -98,6 +98,8 @@
 "ui.circle_buttons" = "원형 버튼";
 "ui.clear" = "지우기";
 "ui.clear_all" = "모두 지우기";
+"ui.clear_all_confirm_help" = "저장된 원본 이미지는 이 Mac에 남아 있으므로 카드를 다시 추가하면 복원할 수 있습니다.";
+"ui.clear_all_confirm_title" = "이 목록에서 모든 카드를 제거할까요?";
 "ui.clear_all_keys" = "모든 키 지우기";
 "ui.clear_key" = "%@ 키 지우기";
 "ui.clear_scan_record" = "검사 기록 지우기";

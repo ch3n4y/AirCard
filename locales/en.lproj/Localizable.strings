@@ -98,6 +98,8 @@
 "ui.circle_buttons" = "Circle Buttons";
 "ui.clear" = "Clear";
 "ui.clear_all" = "Clear All";
+"ui.clear_all_confirm_help" = "Saved original artwork stays on this Mac, so a card can be restored again after it is added back.";
+"ui.clear_all_confirm_title" = "Remove every card from this list?";
 "ui.clear_all_keys" = "Clear All Keys";
 "ui.clear_key" = "Clear Key %@";
 "ui.clear_scan_record" = "Clear Scan Record";

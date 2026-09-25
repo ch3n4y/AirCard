@@ -98,6 +98,8 @@
 "ui.circle_buttons" = "圓形按鍵";
 "ui.clear" = "清除";
 "ui.clear_all" = "全部清除";
+"ui.clear_all_confirm_help" = "儲存的原圖仍留在這台 Mac 上，把卡加回來後依然可以還原。";
+"ui.clear_all_confirm_title" = "要從這個列表裡移除全部卡片嗎？";
 "ui.clear_all_keys" = "清除所有按鍵";
 "ui.clear_key" = "清除按鍵 %@";
 "ui.clear_scan_record" = "清除掃描記錄";

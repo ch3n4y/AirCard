@@ -2337,6 +2337,8 @@ struct WalletCardView: View {
 struct ContentView: View {
     @StateObject private var vm = AppViewModel()
     @State private var showCredits = false
+    /// Clearing the list is one click on a red link, so it asks first.
+    @State private var showClearAllConfirm = false
     @State private var dragOffsetStart: CGPoint = .zero
     @State private var dragKeyStartOffsets: [String: CGPoint] = [:]
     @State private var isTargetedPoster = false
@@ -2641,11 +2643,23 @@ struct ContentView: View {
                     Text("·").foregroundColor(.secondary)
                     
                     Button(L("ui.clear_all", "Clear All")) {
-                        vm.clearAllCards()
+                        showClearAllConfirm = true
                     }
                     .buttonStyle(.link)
                     .font(.caption)
                     .foregroundColor(.red)
+                    .confirmationDialog(
+                        L("ui.clear_all_confirm_title", "Remove every card from this list?"),
+                        isPresented: $showClearAllConfirm,
+                        titleVisibility: .visible
+                    ) {
+                        Button(L("ui.clear_all", "Clear All"), role: .destructive) {
+                            vm.clearAllCards()
+                        }
+                        Button(L("ui.cancel", "Cancel"), role: .cancel) {}
+                    } message: {
+                        Text(L("ui.clear_all_confirm_help", "Saved original artwork stays on this Mac, so a card can be restored again after it is added back."))
+                    }
                 }
             }
         }
@@ -2754,6 +2768,7 @@ struct ContentView: View {
                 }
                 .menuStyle(.button)
                 .controlSize(.regular)
+                .fixedSize()
                 .help(vm.lastScanSeen.isEmpty
                       ? L("ui.scan_record", "Scan Record")
                       : L("ui.not_seen_in_last_scan", "Not seen in the last scan"))

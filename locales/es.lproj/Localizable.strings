@@ -98,6 +98,8 @@
 "ui.circle_buttons" = "Botones circulares";
 "ui.clear" = "Borrar";
 "ui.clear_all" = "Borrar todo";
+"ui.clear_all_confirm_help" = "Las imágenes originales guardadas permanecen en este Mac, así que una tarjeta puede restaurarse de nuevo al volver a añadirla.";
+"ui.clear_all_confirm_title" = "¿Quitar todas las tarjetas de esta lista?";
 "ui.clear_all_keys" = "Borrar todas las teclas";
 "ui.clear_key" = "Borrar tecla %@";
 "ui.clear_scan_record" = "Borrar el resultado del escaneo";

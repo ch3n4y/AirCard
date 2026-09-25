@@ -98,6 +98,8 @@
 "ui.circle_buttons" = "Runde Tasten";
 "ui.clear" = "Löschen";
 "ui.clear_all" = "Alle löschen";
+"ui.clear_all_confirm_help" = "Gesicherte Originalgrafiken bleiben auf diesem Mac. Eine Karte kann nach dem erneuten Hinzufügen wiederhergestellt werden.";
+"ui.clear_all_confirm_title" = "Alle Karten aus dieser Liste entfernen?";
 "ui.clear_all_keys" = "Alle Tasten löschen";
 "ui.clear_key" = "Taste %@ löschen";
 "ui.clear_scan_record" = "Scan-Ergebnis verwerfen";

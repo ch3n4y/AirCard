@@ -98,6 +98,8 @@
 "ui.circle_buttons" = "円形ボタン";
 "ui.clear" = "消去";
 "ui.clear_all" = "すべて消去";
+"ui.clear_all_confirm_help" = "保存された元のカード画像はこのMacに残るため、カードを再追加すれば復元できます。";
+"ui.clear_all_confirm_title" = "この一覧からすべてのカードを削除しますか？";
 "ui.clear_all_keys" = "すべてのキーを消去";
 "ui.clear_key" = "キー%@を消去";
 "ui.clear_scan_record" = "スキャン結果を消去";
