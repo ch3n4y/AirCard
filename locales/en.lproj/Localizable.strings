@@ -77,6 +77,7 @@
 "ui.aircard" = "AirCard";
 "ui.airlift_airtraffic_sync_escape" = "airlift (AirTraffic sync escape)";
 "ui.apple_wallet_skins_passcode_themes" = "Apple Wallet Skins & Passcode Themes for iOS 18+";
+"ui.artwork_from_iphone" = "Read from the iPhone";
 "ui.artwork_loaded" = "Artwork Loaded";
 "ui.assign_card_skin" = "Assign Card Skin";
 "ui.assign_one_skin_to_all" = "Assign one skin to all selected cards";
@@ -99,6 +100,7 @@
 "ui.clear_all" = "Clear All";
 "ui.clear_all_keys" = "Clear All Keys";
 "ui.clear_key" = "Clear Key %@";
+"ui.clear_scan_record" = "Clear Scan Record";
 "ui.clear_theme" = "Clear Theme";
 "ui.click_any_key_on_the" = "Click any key on the dialer to select it, pan the image, adjust zoom, or drop files.";
 "ui.click_scan_cards_in_the" = "Click **Scan Cards** in the toolbar above.";
@@ -148,6 +150,7 @@
 "ui.no_cards_detected_yet" = "No Cards Detected Yet";
 "ui.no_iphone_usb" = "No iPhone (USB)";
 "ui.no_passthm_loaded_select_a" = "No .passthm loaded · Select a theme package to flash";
+"ui.not_seen_in_last_scan" = "Not seen in the last scan";
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "On your iPhone, **double-click the Side button** (Apple Pay), authenticate with **Face ID**, and **tap your card**.";
 "ui.original_saved" = "Original artwork is saved";
@@ -165,6 +168,7 @@
 "ui.remove" = "Remove";
 "ui.remove_from_list" = "Remove from list";
 "ui.remove_skin" = "Remove skin";
+"ui.remove_unseen_cards" = "Remove Cards Not Seen in the Last Scan";
 "ui.reset" = "Reset";
 "ui.reset_position" = "Reset Position";
 "ui.reset_position_zoom" = "Reset Position & Zoom";
@@ -173,6 +177,7 @@
 "ui.save_original" = "Save Original Artwork";
 "ui.save_original_help" = "Save this card's original artwork so it can be put back";
 "ui.scan_cards" = "Scan Cards";
+"ui.scan_record" = "Scan Record";
 "ui.seamless_poster" = "Seamless Poster";
 "ui.select_all" = "Select All";
 "ui.set_skin_for_all" = "Set Skin for All...";

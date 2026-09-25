@@ -65,16 +65,42 @@ class ArtworkCommandTests(unittest.TestCase):
         self.assertTrue(events[-1]["path"].endswith(aircard.PNG_ASSET_NAMES[0]))
         reader.assert_not_called()
 
-    def test_a_backup_beats_a_copy_left_by_an_earlier_read(self):
-        """The backup is the original; a fetched copy is whatever was on the card."""
+    def test_a_read_off_the_phone_wins_over_the_saved_original(self):
+        """The row should show what the card looks like now, not an older snapshot."""
         self.assertTrue(aircard.save_card_backup(UDID, CARD, canonical_assets()))
         self._cache().mkdir(parents=True)
-        (self._cache() / aircard.PDF_ASSET_NAME).write_bytes(b"%PDF-stale")
+        (self._cache() / aircard.PDF_ASSET_NAME).write_bytes(b"%PDF-newer")
 
         ok, events = self._run()
 
         self.assertTrue(ok)
+        self.assertEqual(events[-1]["source"], "cache")
+        self.assertTrue(events[-1]["path"].endswith(aircard.PDF_ASSET_NAME))
+
+    def test_asking_for_the_card_reads_it_even_when_a_copy_exists(self):
+        """Asking for the phone's copy means the phone's copy, not the one on disk."""
+        self.assertTrue(aircard.save_card_backup(UDID, CARD, canonical_assets()))
+        self._cache().mkdir(parents=True)
+        (self._cache() / aircard.PDF_ASSET_NAME).write_bytes(b"%PDF-old")
+        reader = Mock(side_effect=[payload for _, payload in canonical_assets()])
+
+        with patch.object(aircard_backend, "read_file", reader):
+            ok, events = self._run(fetch=True)
+
+        self.assertTrue(ok)
+        self.assertEqual(events[-1]["source"], "device")
+        self.assertEqual(reader.call_count, len(aircard.BACKED_UP_ASSETS))
+
+    def test_a_failed_read_keeps_the_saved_original(self):
+        """Better to show the older picture than to go blank."""
+        self.assertTrue(aircard.save_card_backup(UDID, CARD, canonical_assets()))
+
+        with patch.object(aircard_backend, "read_file", Mock(side_effect=RuntimeError("boom"))):
+            ok, events = self._run(fetch=True)
+
+        self.assertTrue(ok)
         self.assertEqual(events[-1]["source"], "backup")
+        self.assertFalse(self._cache().exists())
 
     def test_a_previous_read_is_reused_instead_of_reading_again(self):
         self._cache().mkdir(parents=True)

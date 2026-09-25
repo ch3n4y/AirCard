@@ -77,6 +77,7 @@
 "ui.aircard" = "AirCard";
 "ui.airlift_airtraffic_sync_escape" = "airlift（AirTraffic 同步逃逸）";
 "ui.apple_wallet_skins_passcode_themes" = "适用于 iOS 18 或更高版本的 Apple 钱包皮肤与密码主题";
+"ui.artwork_from_iphone" = "读取自 iPhone";
 "ui.artwork_loaded" = "图像已载入";
 "ui.assign_card_skin" = "指定卡片皮肤";
 "ui.assign_one_skin_to_all" = "为所有选中的卡片指定同一皮肤";
@@ -99,6 +100,7 @@
 "ui.clear_all" = "全部清除";
 "ui.clear_all_keys" = "清除所有按键";
 "ui.clear_key" = "清除按键 %@";
+"ui.clear_scan_record" = "清除扫描记录";
 "ui.clear_theme" = "清除主题";
 "ui.click_any_key_on_the" = "点按键盘上的任意按键即可选中，拖移图片、调整缩放或拖入文件。";
 "ui.click_scan_cards_in_the" = "点按上方工具栏中的**扫描卡片**。";
@@ -148,6 +150,7 @@
 "ui.no_cards_detected_yet" = "尚未检测到卡片";
 "ui.no_iphone_usb" = "未连接 iPhone（USB）";
 "ui.no_passthm_loaded_select_a" = "未载入 .passthm · 请选择要刷入的主题包";
+"ui.not_seen_in_last_scan" = "上次扫描未发现";
 "ui.ok" = "好";
 "ui.on_your_iphone_double_click" = "在 iPhone 上**连按两下侧边按钮**（Apple Pay），用**面容 ID** 验证，然后**轻点你的卡片**。";
 "ui.original_saved" = "原始图像已存储";
@@ -165,6 +168,7 @@
 "ui.remove" = "移除";
 "ui.remove_from_list" = "从列表中移除";
 "ui.remove_skin" = "移除皮肤";
+"ui.remove_unseen_cards" = "移除上次扫描未发现的卡片";
 "ui.reset" = "重置";
 "ui.reset_position" = "重置位置";
 "ui.reset_position_zoom" = "重置位置与缩放";
@@ -173,6 +177,7 @@
 "ui.save_original" = "存储原始图像";
 "ui.save_original_help" = "存储这张卡片的原始图像，以后可随时恢复";
 "ui.scan_cards" = "扫描卡片";
+"ui.scan_record" = "扫描记录";
 "ui.seamless_poster" = "无缝海报";
 "ui.select_all" = "全选";
 "ui.set_skin_for_all" = "统一设置皮肤…";

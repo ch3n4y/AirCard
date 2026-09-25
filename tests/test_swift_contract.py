@@ -144,5 +144,50 @@ class FlashLedgerContractTests(unittest.TestCase):
                 )
 
 
+class ScanRecordContractTests(unittest.TestCase):
+    """The card list only ever grew, so a card taken out of Wallet stayed listed.
+
+    Nothing runs Swift in this suite, so these pin the shape of the fix in the
+    source, the same way the ledger tests above do.
+    """
+
+    def _body(self, name):
+        body = swift_function(name)
+        if body is None:
+            self.skipTest(f"{name} is not defined in this build of the app")
+        return body
+
+    def test_a_scan_records_the_cards_it_actually_saw(self):
+        body = self._body("startCardScanning")
+        self.assertIn("scanSeen = []", body,
+                      "a scan must start from an empty record, or it inherits the last one")
+        self.assertIn(
+            "self.scanSeen.insert(candidate)", body,
+            "cards the scan found are not recorded, so a remembered row cannot be told "
+            "apart from one that was actually seen",
+        )
+
+    def test_the_record_is_kept_but_not_from_an_empty_scan(self):
+        self.assertIn("rememberScanResult()", self._body("stopCardScanning"),
+                      "the scan result is thrown away, so the rows are never marked")
+        remember = self._body("rememberScanResult")
+        self.assertIn(
+            "guard !scanSeen.isEmpty", remember,
+            "a scan that observed nothing would mark every card as unseen",
+        )
+        self.assertIn("lastScanSeenKey", remember,
+                      "the record would not survive a relaunch")
+
+    def test_removing_unseen_cards_deletes_nothing_on_disk(self):
+        """The rows go; the saved artwork behind them stays."""
+        body = self._body("removeCardsNotSeenInLastScan")
+        self.assertIn("cards.removeAll", body)
+        for forbidden in ("forget_card_artwork", "--forget", "FileManager", "removeItem"):
+            self.assertNotIn(
+                forbidden, body,
+                f"removing a row calls {forbidden}, which could destroy a saved original",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

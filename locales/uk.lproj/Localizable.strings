@@ -77,6 +77,7 @@
 "ui.aircard" = "AirCard";
 "ui.airlift_airtraffic_sync_escape" = "airlift (обхід синхронізації AirTraffic)";
 "ui.apple_wallet_skins_passcode_themes" = "Оформлення карток Apple Wallet і теми код-пароля для iOS 18+";
+"ui.artwork_from_iphone" = "Прочитано з iPhone";
 "ui.artwork_loaded" = "Зображення завантажено";
 "ui.assign_card_skin" = "Призначити оформлення картки";
 "ui.assign_one_skin_to_all" = "Призначити одне оформлення всім вибраним карткам";
@@ -99,6 +100,7 @@
 "ui.clear_all" = "Очистити все";
 "ui.clear_all_keys" = "Очистити всі клавіші";
 "ui.clear_key" = "Очистити клавішу %@";
+"ui.clear_scan_record" = "Очистити результат сканування";
 "ui.clear_theme" = "Очистити тему";
 "ui.click_any_key_on_the" = "Натисніть клавішу на клавіатурі, щоб вибрати її, посуньте зображення, змініть масштаб або перетягніть файли.";
 "ui.click_scan_cards_in_the" = "Натисніть **Сканувати картки** на панелі вгорі.";
@@ -148,6 +150,7 @@
 "ui.no_cards_detected_yet" = "Карток поки не знайдено";
 "ui.no_iphone_usb" = "Немає iPhone (USB)";
 "ui.no_passthm_loaded_select_a" = "Файл .passthm не завантажено · виберіть пакет теми для запису";
+"ui.not_seen_in_last_scan" = "Не знайдено під час останнього сканування";
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "На iPhone **двічі натисніть бічну кнопку** (Apple Pay), пройдіть автентифікацію **Face ID** і **торкніться картки**.";
 "ui.original_saved" = "Оригінал збережено";
@@ -165,6 +168,7 @@
 "ui.remove" = "Вилучити";
 "ui.remove_from_list" = "Вилучити зі списку";
 "ui.remove_skin" = "Вилучити оформлення";
+"ui.remove_unseen_cards" = "Прибрати картки, не знайдені під час сканування";
 "ui.reset" = "Скинути";
 "ui.reset_position" = "Скинути положення";
 "ui.reset_position_zoom" = "Скинути положення й масштаб";
@@ -173,6 +177,7 @@
 "ui.save_original" = "Зберегти оригінальне оформлення";
 "ui.save_original_help" = "Зберегти оригінальне оформлення картки, щоб згодом його повернути";
 "ui.scan_cards" = "Сканувати картки";
+"ui.scan_record" = "Результат сканування";
 "ui.seamless_poster" = "Суцільний постер";
 "ui.select_all" = "Вибрати все";
 "ui.set_skin_for_all" = "Задати оформлення для всіх…";

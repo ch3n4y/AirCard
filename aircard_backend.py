@@ -259,8 +259,12 @@ def cmd_backups(udid: str):
 def cmd_artwork(udid: str, card_hash: str, fetch: bool = False, forget: bool = False) -> bool:
     """Answers where the app can find a picture of this card.
 
-    Resolved on this Mac wherever possible -- the saved original first, then a
-    copy an earlier read left behind -- because that costs the phone nothing.
+    Resolved on this Mac wherever possible, because that costs the phone nothing.
+    A picture read off the phone wins over the saved original: the row is there to
+    show which card is which, and the newer read is what the card looks like now.
+    The backup still governs what a restore puts back, which is a different
+    question.
+
     Reading the artwork is opt-in: it moves the file off the card and writes it
     back, which is not something to do to someone's card behind their back.
 
@@ -270,15 +274,15 @@ def cmd_artwork(udid: str, card_hash: str, fetch: bool = False, forget: bool = F
     if forget:
         forget_card_artwork(udid, card_hash)
 
-    saved = card_artwork_file(card_backup_dir(udid, card_hash))
-    if saved:
-        print(json.dumps({"ok": True, "path": str(saved), "source": "backup"}))
-        return True
-
     cached = card_artwork_cache_dir(udid, card_hash)
     held = card_artwork_file(cached)
     if held and not fetch:
         print(json.dumps({"ok": True, "path": str(held), "source": "cache"}))
+        return True
+
+    saved = card_artwork_file(card_backup_dir(udid, card_hash))
+    if saved and not fetch:
+        print(json.dumps({"ok": True, "path": str(saved), "source": "backup"}))
         return True
 
     if not fetch:
@@ -293,11 +297,7 @@ def cmd_artwork(udid: str, card_hash: str, fetch: bool = False, forget: bool = F
     try:
         cached.mkdir(parents=True, exist_ok=True)
     except OSError as error:
-        print(json.dumps({
-            "ok": False, "card": card_hash, "code": "artwork.read_failed",
-            "message": f"Could not store the artwork for {card_hash[:12]}... ({error})"
-        }))
-        return False
+        return _artwork_unreadable(card_hash, saved, f"({error})")
 
     for asset in BACKED_UP_ASSETS:
         try:
@@ -317,12 +317,7 @@ def cmd_artwork(udid: str, card_hash: str, fetch: bool = False, forget: bool = F
         # Nothing readable at all: do not leave an empty directory behind, or the
         # next look-up would think there is something to show.
         forget_card_artwork(udid, card_hash)
-        print(json.dumps({
-            "ok": False, "card": card_hash, "code": "artwork.read_failed",
-            "message": (f"Could not read the artwork for {card_hash[:12]}... "
-                        f"({', '.join(unread)})")
-        }))
-        return False
+        return _artwork_unreadable(card_hash, saved, f"({', '.join(unread)})")
 
     if unread:
         # Worth saying: the thumbnail is real, but it is not the whole picture.
@@ -334,6 +329,22 @@ def cmd_artwork(udid: str, card_hash: str, fetch: bool = False, forget: bool = F
         }))
     print(json.dumps({"ok": True, "path": str(fetched), "source": "device"}))
     return True
+
+
+def _artwork_unreadable(card_hash: str, saved: "Path | None", detail: str) -> bool:
+    """A read that did not happen. Keep the saved original rather than go blank."""
+    if saved:
+        print(json.dumps({
+            "type": "progress", "card": card_hash, "code": "artwork.partial",
+            "message": f"Could not read the card; keeping the saved artwork {detail}"
+        }))
+        print(json.dumps({"ok": True, "path": str(saved), "source": "backup"}))
+        return True
+    print(json.dumps({
+        "ok": False, "card": card_hash, "code": "artwork.read_failed",
+        "message": f"Could not read the artwork for {card_hash[:12]}... {detail}"
+    }))
+    return False
 
 
 def cmd_get_saved_cards():

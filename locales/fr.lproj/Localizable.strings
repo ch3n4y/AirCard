@@ -77,6 +77,7 @@
 "ui.aircard" = "AirCard";
 "ui.airlift_airtraffic_sync_escape" = "airlift (contournement de la synchro AirTraffic)";
 "ui.apple_wallet_skins_passcode_themes" = "Habillages Apple Wallet et thèmes de code pour iOS 18 ou ultérieur";
+"ui.artwork_from_iphone" = "Lu depuis l'iPhone";
 "ui.artwork_loaded" = "Illustration chargée";
 "ui.assign_card_skin" = "Attribuer un habillage";
 "ui.assign_one_skin_to_all" = "Attribuer un même habillage à toutes les cartes sélectionnées";
@@ -99,6 +100,7 @@
 "ui.clear_all" = "Tout effacer";
 "ui.clear_all_keys" = "Effacer toutes les touches";
 "ui.clear_key" = "Effacer la touche %@";
+"ui.clear_scan_record" = "Effacer le résultat du scan";
 "ui.clear_theme" = "Effacer le thème";
 "ui.click_any_key_on_the" = "Cliquez sur une touche du clavier pour la sélectionner, déplacez l'image, ajustez le zoom ou déposez des fichiers.";
 "ui.click_scan_cards_in_the" = "Cliquez sur **Rechercher les cartes** dans la barre d'outils.";
@@ -148,6 +150,7 @@
 "ui.no_cards_detected_yet" = "Aucune carte détectée";
 "ui.no_iphone_usb" = "Aucun iPhone (USB)";
 "ui.no_passthm_loaded_select_a" = "Aucun .passthm chargé · Sélectionnez un thème à installer";
+"ui.not_seen_in_last_scan" = "Non vue lors du dernier scan";
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "Sur votre iPhone, **double-cliquez sur le bouton latéral** (Apple Pay), validez avec **Face ID**, puis **touchez votre carte**.";
 "ui.original_saved" = "Illustration d'origine enregistrée";
@@ -165,6 +168,7 @@
 "ui.remove" = "Supprimer";
 "ui.remove_from_list" = "Retirer de la liste";
 "ui.remove_skin" = "Retirer l'habillage";
+"ui.remove_unseen_cards" = "Retirer les cartes absentes du dernier scan";
 "ui.reset" = "Réinitialiser";
 "ui.reset_position" = "Réinitialiser la position";
 "ui.reset_position_zoom" = "Réinitialiser la position et le zoom";
@@ -173,6 +177,7 @@
 "ui.save_original" = "Enregistrer l'illustration d'origine";
 "ui.save_original_help" = "Enregistrer l'illustration d'origine de cette carte pour pouvoir la restaurer";
 "ui.scan_cards" = "Rechercher les cartes";
+"ui.scan_record" = "Résultat du scan";
 "ui.seamless_poster" = "Affiche continue";
 "ui.select_all" = "Tout sélectionner";
 "ui.set_skin_for_all" = "Habiller toutes les cartes…";

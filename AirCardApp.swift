@@ -586,6 +586,15 @@ class AppViewModel: ObservableObject {
     /// card hash; a missing entry means nothing is known about that card yet.
     @Published var cardArtwork: [String: NSImage] = [:]
     @Published var artworkBeingRead: Set<String> = []
+
+    /// Where the picture on a row came from: "backup" or "device". The two mean
+    /// different things, so the row says which one it is showing.
+    @Published var cardArtworkSource: [String: String] = [:]
+    /// Which cards the last finished scan actually watched Wallet log. Empty until
+    /// a scan has run; a row missing from it was not seen that time.
+    @Published var lastScanSeen: Set<String> = []
+    /// Filling up during a scan, then handed to lastScanSeen when it stops.
+    private var scanSeen: Set<String> = []
     @Published var isCheckingDevice = false
     @Published var isScanningCards = false
     @Published var cards: [CardItem] = []
@@ -605,6 +614,7 @@ class AppViewModel: ObservableObject {
     private let scriptDir: String
     private let storageKey = "mak5er.aircard.savedCards"
     private let flashedSkinsKey = "mak5er.aircard.flashedSkins"
+    private let lastScanSeenKey = "mak5er.aircard.lastScanSeen"
     /// "udid|cardHash" -> skin signature last flashed successfully.
     @Published var flashedSkins: [String: String] = [:]
     private let legacyStorageKey1 = "mak5er.savedCards"
@@ -627,6 +637,7 @@ class AppViewModel: ObservableObject {
         }
         
         flashedSkins = UserDefaults.standard.dictionary(forKey: flashedSkinsKey) as? [String: String] ?? [:]
+        lastScanSeen = Set(UserDefaults.standard.stringArray(forKey: lastScanSeenKey) ?? [])
         loadSavedCards()
         checkDevice()
     }
@@ -1009,13 +1020,14 @@ class AppViewModel: ObservableObject {
             for id in wanted {
                 let data = AppViewModel.runBackend(
                     ["aircard_backend.py", "--artwork", udid, id], scriptDir: scriptDir)
-                let path = AppViewModel.artworkPath(from: data)
+                let found = AppViewModel.artworkFile(from: data)
                 await MainActor.run {
                     self.artworkBeingRead.remove(id)
                     // Loaded here, on the main actor: NSImage is not Sendable and
                     // must not be carried back out of the worker.
-                    if let path = path, let image = NSImage(contentsOfFile: path) {
+                    if let found = found, let image = NSImage(contentsOfFile: found.path) {
                         self.cardArtwork[id] = image
+                        self.cardArtworkSource[id] = found.source
                     }
                 }
             }
@@ -1040,13 +1052,14 @@ class AppViewModel: ObservableObject {
         Task.detached {
             let data = AppViewModel.runBackend(
                 ["aircard_backend.py", "--artwork", udid, cardId, "--fetch"], scriptDir: scriptDir)
-            let path = AppViewModel.artworkPath(from: data)
+            let found = AppViewModel.artworkFile(from: data)
             let said = data.flatMap { AppViewModel.artworkFailureMessage(from: $0) }
             await MainActor.run {
                 self.artworkBeingRead.remove(cardId)
                 self.statusText = L("status.ready", "Ready")
-                if let path = path, let image = NSImage(contentsOfFile: path) {
+                if let found = found, let image = NSImage(contentsOfFile: found.path) {
                     self.cardArtwork[cardId] = image
+                    self.cardArtworkSource[cardId] = found.source
                 } else {
                     self.errorMessage = L("error.could_not_read_card_artwork",
                                           "Could not read this card's artwork. See the log.")
@@ -1061,36 +1074,40 @@ class AppViewModel: ObservableObject {
         guard let udid = device?.udid else { return }
         let scriptDir = self.scriptDir
         artworkBeingRead.formUnion(ids)
-        for id in ids { cardArtwork[id] = nil }
+        for id in ids {
+            cardArtwork[id] = nil
+            cardArtworkSource[id] = nil
+        }
         Task.detached {
             for id in ids {
                 _ = AppViewModel.runBackend(
                     ["aircard_backend.py", "--artwork", udid, id, "--forget"], scriptDir: scriptDir)
                 let data = AppViewModel.runBackend(
                     ["aircard_backend.py", "--artwork", udid, id], scriptDir: scriptDir)
-                let path = AppViewModel.artworkPath(from: data)
+                let found = AppViewModel.artworkFile(from: data)
                 await MainActor.run {
                     self.artworkBeingRead.remove(id)
-                    if let path = path, let image = NSImage(contentsOfFile: path) {
+                    if let found = found, let image = NSImage(contentsOfFile: found.path) {
                         self.cardArtwork[id] = image
+                        self.cardArtworkSource[id] = found.source
                     }
                 }
             }
         }
     }
 
-    /// The file the backend says holds this card's artwork, if there is one.
+    /// The file the backend says holds a card's artwork, and where it came from.
     ///
     /// Returns a path rather than an image: NSImage is not Sendable, so it has to
     /// be loaded on the main actor instead of in the worker that ran the tool.
-    nonisolated private static func artworkPath(from data: Data?) -> String? {
+    nonisolated private static func artworkFile(from data: Data?) -> (path: String, source: String)? {
         guard let data = data, let text = String(data: data, encoding: .utf8) else { return nil }
         for line in text.split(separator: "\n") {
             guard let lineData = line.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
                   (json["ok"] as? Bool) == true,
                   let path = json["path"] as? String else { continue }
-            return path
+            return (path, json["source"] as? String ?? "unknown")
         }
         return nil
     }
@@ -1239,6 +1256,7 @@ class AppViewModel: ObservableObject {
             return
         }
         isScanningCards = true
+        scanSeen = []
         statusText = L("status.double_click_side_button_pass", "Double-click Side button, pass Face ID, then tap your card...")
         log("Started scanning device logs for cards...")
         
@@ -1331,6 +1349,10 @@ class AppViewModel: ObservableObject {
                                     
                                     await MainActor.run {
                                         guard self.scanProcess === proc else { return }
+                                        // Recorded whether or not it is already on
+                                        // the list: this is what tells a remembered
+                                        // row from one the scan actually saw.
+                                        self.scanSeen.insert(candidate)
                                         if !self.cards.contains(where: { $0.id == candidate }) {
                                             self.cards.append(CardItem(id: candidate, isSelected: true))
                                             self.saveCards()
@@ -1378,7 +1400,55 @@ class AppViewModel: ObservableObject {
             statusText = L("status.ready", "Ready")
         }
         saveCards()
+        rememberScanResult()
         log("Scanning stopped. Total cards: \(cards.count).")
+    }
+
+    /// Keeps what this scan saw, so rows it did not see can be told apart.
+    ///
+    /// An empty result is not recorded: the phone may simply not have shown any
+    /// card while the scan was running, and storing that would mark every row as
+    /// unseen on the strength of a scan that observed nothing.
+    private func rememberScanResult() {
+        guard !scanSeen.isEmpty else { return }
+        lastScanSeen = scanSeen
+        UserDefaults.standard.set(Array(scanSeen), forKey: lastScanSeenKey)
+        log("Last scan saw \(scanSeen.count) card(s).")
+    }
+
+    /// True when a scan has run and did not see this card.
+    func wasNotSeenInLastScan(_ cardId: String) -> Bool {
+        !lastScanSeen.isEmpty && !lastScanSeen.contains(cardId)
+    }
+
+    /// Cards the last scan ran past. Without this the list only grows, so a card
+    /// that is no longer in Wallet stays listed forever.
+    var cardsNotSeenInLastScan: [CardItem] {
+        cards.filter { wasNotSeenInLastScan($0.id) }
+    }
+
+    /// Drops the rows the last scan did not see.
+    ///
+    /// Only when asked: a card can be missed just because it was not shown on the
+    /// phone while the scan ran. Saved artwork is deliberately left on disk, so
+    /// re-adding the card brings its original back with it.
+    func removeCardsNotSeenInLastScan() {
+        let doomed = Set(cardsNotSeenInLastScan.map(\.id))
+        guard !doomed.isEmpty else { return }
+        cards.removeAll { doomed.contains($0.id) }
+        for id in doomed {
+            cardArtwork[id] = nil
+            cardArtworkSource[id] = nil
+        }
+        saveCards()
+        log("Removed \(doomed.count) card(s) the last scan did not see. Their saved artwork is untouched.")
+    }
+
+    /// Forgets which cards the last scan saw, so the rows stop being marked.
+    func clearScanRecord() {
+        lastScanSeen = []
+        UserDefaults.standard.removeObject(forKey: lastScanSeenKey)
+        log("Cleared the scan record.")
     }
     
     // MARK: - Skin Application
@@ -1907,6 +1977,10 @@ struct WalletCardView: View {
     let artwork: NSImage?
     /// True while that artwork is being read off the phone.
     let isReadingArtwork: Bool
+    /// True when a scan has run and did not see this card, so the row can say so.
+    let notSeenInLastScan: Bool
+    /// "backup" or "device": where the picture on this row came from.
+    let artworkSource: String?
     let onReadArtwork: () -> Void
     let onPickImage: () -> Void
     let onClearImage: () -> Void
@@ -1979,6 +2053,19 @@ struct WalletCardView: View {
                             .scaledToFill()
                             .frame(width: 290, height: 182)
                             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay(alignment: .topLeading) {
+                                // Say where the picture came from: the saved original
+                                // and what is on the phone now are not the same thing.
+                                Image(systemName: artworkSource == "device" ? "iphone" : "tray.full")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .padding(6)
+                                    .background(Circle().fill(Color.black.opacity(0.45)))
+                                    .padding(8)
+                                    .help(artworkSource == "device"
+                                          ? L("ui.artwork_from_iphone", "Read from the iPhone")
+                                          : L("ui.original_saved", "Original artwork is saved"))
+                            }
                         
                         LinearGradient(
                             colors: [.white.opacity(0.18), .clear, .black.opacity(0.12)],
@@ -2156,6 +2243,13 @@ struct WalletCardView: View {
                         .font(.system(size: 12))
                         .help(isFlashed ? L("ui.skin_already_on_iphone", "Skin already on iPhone") : L("ui.skin_changed_will_be_flashed", "Skin changed, will be flashed"))
                 }
+
+                if notSeenInLastScan {
+                    Image(systemName: "questionmark.circle")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 12))
+                        .help(L("ui.not_seen_in_last_scan", "Not seen in the last scan"))
+                }
                 
                 Menu {
                     Button(action: onBackup) {
@@ -2234,6 +2328,7 @@ struct WalletCardView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(card.isSelected ? Color.accentColor.opacity(0.3) : Color.clear, lineWidth: 1)
         )
+        .opacity(notSeenInLastScan ? 0.55 : 1)
     }
 }
 
@@ -2304,6 +2399,8 @@ struct ContentView: View {
                                     busy: vm.isFlashing,
                                     artwork: vm.cardArtwork[vm.cards[idx].id],
                                     isReadingArtwork: vm.artworkBeingRead.contains(vm.cards[idx].id),
+                                    notSeenInLastScan: vm.wasNotSeenInLastScan(vm.cards[idx].id),
+                                    artworkSource: vm.cardArtworkSource[vm.cards[idx].id],
                                     onReadArtwork: { vm.readArtworkFromPhone(cardId: vm.cards[idx].id) },
                                     onPickImage: { openCardImagePicker(for: vm.cards[idx].id) },
                                     onClearImage: { vm.clearCardImage(for: vm.cards[idx].id) },
@@ -2636,6 +2733,31 @@ struct ContentView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
+
+                // What the last scan actually watched Wallet log, so a row it did
+                // not see can be told apart from one that is still in Wallet. The
+                // list only ever grew before this, so a removed card stayed forever.
+                Menu {
+                    Button(L("ui.remove_unseen_cards", "Remove Cards Not Seen in the Last Scan")) {
+                        vm.removeCardsNotSeenInLastScan()
+                    }
+                    .disabled(vm.cardsNotSeenInLastScan.isEmpty)
+
+                    Divider()
+                    Button(L("ui.clear_scan_record", "Clear Scan Record")) {
+                        vm.clearScanRecord()
+                    }
+                    .disabled(vm.lastScanSeen.isEmpty)
+                } label: {
+                    Label(L("ui.scan_record", "Scan Record"),
+                          systemImage: vm.lastScanSeen.isEmpty ? "questionmark.circle" : "checklist")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .controlSize(.regular)
+                .help(vm.lastScanSeen.isEmpty
+                      ? L("ui.scan_record", "Scan Record")
+                      : L("ui.not_seen_in_last_scan", "Not seen in the last scan"))
             }
         }
         .padding(40)
