@@ -42,6 +42,16 @@ def required_keys(struct_name: str):
     return out
 
 
+def swift_function(name: str):
+    """The body of a class-level Swift function in the app, or None if absent."""
+    src = SWIFT.read_text(encoding="utf-8")
+    m = re.search(
+        rf"^    (?:private )?func {re.escape(name)}\([^\n]*\{{$\n(.*?)^    \}}$",
+        src, re.M | re.S,
+    )
+    return m.group(1) if m else None
+
+
 class SwiftDecodeContractTests(unittest.TestCase):
     def _normalized(self):
         return aircard._normalize_device({
@@ -87,6 +97,51 @@ class SwiftDecodeContractTests(unittest.TestCase):
         broken.pop("connected", None)
         self.assertIn("connected", self._required("DeviceInfo"))
         self.assertTrue(self._required("DeviceInfo") - set(broken))
+
+
+class FlashLedgerContractTests(unittest.TestCase):
+    """Nothing runs Swift in this suite, so the restore path is pinned by shape.
+
+    The app remembers, per device and card, the signature of the skin it last put
+    on the phone. A restore makes that record false. Left in place, re-picking
+    the same image reads as "already on iPhone" and the skin is never written
+    again.
+    """
+
+    def _body(self, name):
+        body = swift_function(name)
+        if body is None:
+            self.skipTest(f"{name} is not defined in this build of the app")
+        return body
+
+    def test_the_source_extraction_finds_a_real_body(self):
+        """Guards the guard: a regex that stopped matching would skip everything."""
+        body = swift_function("applySkin")
+        self.assertIsNotNone(body, "swift_function can no longer read a function body")
+        self.assertIn("no_iphone_connected", body)
+
+    def test_a_restore_forgets_the_skin_the_card_used_to_carry(self):
+        body = self._body("restoreCard")
+        call = "forgetFlashedSkin(udid: udid, cardId: id)"
+        self.assertIn("if restored {", body, "restoreCard has no success branch to check")
+        self.assertIn(
+            call, body,
+            "restoreCard leaves the flashed-skin ledger alone, so re-picking the same "
+            "image reads as 'already on iPhone' and is skipped",
+        )
+        self.assertLess(
+            body.index("if restored {"), body.index(call),
+            "the ledger only stops being true once the restore has succeeded",
+        )
+
+    def test_a_missing_iphone_is_reported_rather_than_ignored(self):
+        for name in ("backupCard", "restoreCard"):
+            with self.subTest(function=name):
+                self.assertIn(
+                    'L("error.no_iphone_connected"', self._body(name),
+                    f"{name} returns silently when no iPhone is connected, while its "
+                    f"menu item stays enabled, so the click does nothing at all",
+                )
 
 
 if __name__ == "__main__":

@@ -82,7 +82,6 @@
 "ui.by" = "Por";
 "ui.cancel" = "Cancelar";
 "ui.card_number" = "Tarjeta n.º %d";
-"ui.cards_selected_status" = "%1$d de %2$d tarjetas seleccionadas · %3$d listas para aplicar";
 "ui.cards_selected_status_changed" = "%1$d de %2$d tarjetas seleccionadas · %3$d modificadas · %4$d ya en el iPhone";
 "ui.change" = "Cambiar…";
 "ui.change_image" = "Cambiar imagen…";
@@ -132,7 +131,6 @@
 "ui.flash_passcode_theme" = "Aplicar tema de código";
 "ui.flash_skins" = "Aplicar diseños";
 "ui.flash_skins_changed_count" = "Aplicar diseños (%d modificadas)";
-"ui.flash_skins_count" = "Aplicar diseños (%d)";
 "ui.flash_to_iphone" = "Aplicar en el iPhone";
 "ui.flashing_cards" = "Aplicando tarjetas…";
 "ui.flashing_passcode" = "Aplicando el tema de código…";
@@ -175,7 +173,6 @@
 "ui.select_all" = "Seleccionar todo";
 "ui.set_skin_for_all" = "Asignar diseño a todas…";
 "ui.skin_already_on_iphone" = "Diseño ya en el iPhone";
-"ui.skin_assigned_and_ready" = "Diseño asignado y listo";
 "ui.skin_changed_will_be_flashed" = "Diseño modificado, se aplicará";
 "ui.skins_successfully_applied_to_all" = "¡Diseños aplicados a todas las tarjetas seleccionadas!\n\nFuerza el cierre de la app Wallet en el iPhone (o reinícialo) para ver los nuevos diseños.";
 "ui.slice_circle_desc" = "La imagen se recorta en iconos circulares para cada tecla.";

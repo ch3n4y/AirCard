@@ -82,7 +82,6 @@
 "ui.by" = "Автор";
 "ui.cancel" = "Отменить";
 "ui.card_number" = "Карта №%d";
-"ui.cards_selected_status" = "Выбрано карт: %1$d из %2$d · Готово к прошивке: %3$d";
 "ui.cards_selected_status_changed" = "Выбрано карт: %1$d из %2$d · Изменено: %3$d · Уже на iPhone: %4$d";
 "ui.change" = "Изменить…";
 "ui.change_image" = "Изменить изображение…";
@@ -132,7 +131,6 @@
 "ui.flash_passcode_theme" = "Прошить тему код-пароля";
 "ui.flash_skins" = "Прошить обложки";
 "ui.flash_skins_changed_count" = "Прошить обложки (%d изм.)";
-"ui.flash_skins_count" = "Прошить обложки (%d)";
 "ui.flash_to_iphone" = "Прошить на iPhone";
 "ui.flashing_cards" = "Прошивка карт…";
 "ui.flashing_passcode" = "Прошивка код-пароля…";
@@ -175,7 +173,6 @@
 "ui.select_all" = "Выбрать все";
 "ui.set_skin_for_all" = "Задать обложку для всех…";
 "ui.skin_already_on_iphone" = "Обложка уже на iPhone";
-"ui.skin_assigned_and_ready" = "Обложка назначена, всё готово";
 "ui.skin_changed_will_be_flashed" = "Обложка изменена, будет прошита";
 "ui.skins_successfully_applied_to_all" = "Обложки применены ко всем выбранным картам!\n\nПринудительно завершите Wallet на iPhone (или перезагрузите его), чтобы увидеть новое оформление.";
 "ui.slice_circle_desc" = "Изображение обрезается по кругу для каждой кнопки.";

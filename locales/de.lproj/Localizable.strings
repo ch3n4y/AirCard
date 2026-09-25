@@ -82,7 +82,6 @@
 "ui.by" = "Von";
 "ui.cancel" = "Abbrechen";
 "ui.card_number" = "Karte %d";
-"ui.cards_selected_status" = "%1$d von %2$d Karten ausgewählt · %3$d bereit zum Aufspielen";
 "ui.cards_selected_status_changed" = "%1$d von %2$d Karten ausgewählt · %3$d geändert · %4$d bereits auf dem iPhone";
 "ui.change" = "Ändern …";
 "ui.change_image" = "Bild ändern …";
@@ -132,7 +131,6 @@
 "ui.flash_passcode_theme" = "Code-Design aufspielen";
 "ui.flash_skins" = "Skins aufspielen";
 "ui.flash_skins_changed_count" = "Skins aufspielen (%d geändert)";
-"ui.flash_skins_count" = "Skins aufspielen (%d)";
 "ui.flash_to_iphone" = "Aufs iPhone aufspielen";
 "ui.flashing_cards" = "Karten werden aufgespielt …";
 "ui.flashing_passcode" = "Code wird aufgespielt …";
@@ -175,7 +173,6 @@
 "ui.select_all" = "Alle auswählen";
 "ui.set_skin_for_all" = "Skin für alle festlegen …";
 "ui.skin_already_on_iphone" = "Skin bereits auf dem iPhone";
-"ui.skin_assigned_and_ready" = "Skin zugewiesen und bereit";
 "ui.skin_changed_will_be_flashed" = "Skin geändert, wird aufgespielt";
 "ui.skins_successfully_applied_to_all" = "Skins erfolgreich auf alle ausgewählten Karten angewendet!\n\nBeende die Wallet-App auf deinem iPhone vollständig (oder starte das iPhone neu), um die neuen Designs zu sehen.";
 "ui.slice_circle_desc" = "Die Grafik wird in einzelne runde Tastensymbole geschnitten.";

@@ -82,7 +82,6 @@
 "ui.by" = "제작";
 "ui.cancel" = "취소";
 "ui.card_number" = "%d번 카드";
-"ui.cards_selected_status" = "카드 %2$d개 중 %1$d개 선택됨 · %3$d개 적용 준비 완료";
 "ui.cards_selected_status_changed" = "카드 %2$d개 중 %1$d개 선택됨 · %3$d개 변경됨 · %4$d개 이미 적용됨";
 "ui.change" = "변경...";
 "ui.change_image" = "이미지 변경...";
@@ -132,7 +131,6 @@
 "ui.flash_passcode_theme" = "암호 테마 적용";
 "ui.flash_skins" = "스킨 적용";
 "ui.flash_skins_changed_count" = "스킨 적용 (%d개 변경)";
-"ui.flash_skins_count" = "스킨 적용 (%d)";
 "ui.flash_to_iphone" = "iPhone에 적용";
 "ui.flashing_cards" = "카드 적용 중...";
 "ui.flashing_passcode" = "암호 적용 중...";
@@ -175,7 +173,6 @@
 "ui.select_all" = "모두 선택";
 "ui.set_skin_for_all" = "모든 카드에 스킨 지정...";
 "ui.skin_already_on_iphone" = "스킨이 이미 iPhone에 있음";
-"ui.skin_assigned_and_ready" = "스킨 지정 완료";
 "ui.skin_changed_will_be_flashed" = "스킨이 변경되어 적용됩니다";
 "ui.skins_successfully_applied_to_all" = "선택한 모든 카드에 스킨을 적용했습니다!\n\niPhone에서 지갑 앱을 강제 종료하거나 재시동하면 새 디자인이 나타납니다.";
 "ui.slice_circle_desc" = "아트워크를 원형 버튼 아이콘으로 하나씩 잘라냅니다.";

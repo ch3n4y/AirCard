@@ -82,7 +82,6 @@
 "ui.by" = "作者";
 "ui.cancel" = "取消";
 "ui.card_number" = "卡片 %d";
-"ui.cards_selected_status" = "已選取 %2$d 張卡片中的 %1$d 張 · %3$d 張可寫入";
 "ui.cards_selected_status_changed" = "已選取 %2$d 張卡片中的 %1$d 張 · %3$d 張有變更 · %4$d 張已在 iPhone 上";
 "ui.change" = "更改…";
 "ui.change_image" = "更改圖片…";
@@ -132,7 +131,6 @@
 "ui.flash_passcode_theme" = "寫入密碼主題";
 "ui.flash_skins" = "寫入外觀";
 "ui.flash_skins_changed_count" = "寫入外觀（%d 張有變更）";
-"ui.flash_skins_count" = "寫入外觀（%d）";
 "ui.flash_to_iphone" = "寫入 iPhone";
 "ui.flashing_cards" = "正在寫入卡片…";
 "ui.flashing_passcode" = "正在寫入密碼主題…";
@@ -175,7 +173,6 @@
 "ui.select_all" = "全選";
 "ui.set_skin_for_all" = "全部指定同一外觀…";
 "ui.skin_already_on_iphone" = "外觀已在 iPhone 上";
-"ui.skin_assigned_and_ready" = "外觀已指定，可以寫入";
 "ui.skin_changed_will_be_flashed" = "外觀有變更，將寫入";
 "ui.skins_successfully_applied_to_all" = "所有選取的卡片都已套用新外觀！\n\n請在 iPhone 上強制結束「錢包」App（或重新開機），就能看到新的設計。";
 "ui.slice_circle_desc" = "圖稿會裁切成一個個圓形按鍵圖像。";

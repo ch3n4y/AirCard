@@ -862,6 +862,18 @@ class AppViewModel: ObservableObject {
         flashedSkins[flashedKey(udid: udid, cardId: card.id)] = sig
         UserDefaults.standard.set(flashedSkins, forKey: flashedSkinsKey)
     }
+
+    /// Drops the record of a skin being on the device, because it no longer is.
+    ///
+    /// A restore puts the original artwork back, so a signature recorded by an
+    /// earlier flash stops describing the card. Left behind, it would make
+    /// re-picking the same image read as "already on iPhone" and the skin would
+    /// never be written again.
+    private func forgetFlashedSkin(udid: String, cardId: String) {
+        let key = flashedKey(udid: udid, cardId: cardId)
+        guard flashedSkins.removeValue(forKey: key) != nil else { return }
+        UserDefaults.standard.set(flashedSkins, forKey: flashedSkinsKey)
+    }
     
     // MARK: - Device Connection
     
@@ -982,7 +994,11 @@ class AppViewModel: ObservableObject {
     // this is something the user asks for rather than something a flash does
     // quietly on their behalf.
     func backupCard(id: String) {
-        guard let udid = device?.udid, !isFlashing else { return }
+        guard !isFlashing else { return }
+        guard let udid = device?.udid else {
+            errorMessage = L("error.no_iphone_connected", "No iPhone connected.")
+            return
+        }
         // Clear last time's error, or it outlives the run that caused it.
         errorMessage = nil
         isFlashing = true
@@ -1012,7 +1028,11 @@ class AppViewModel: ObservableObject {
     }
 
     func restoreCard(id: String) {
-        guard let udid = device?.udid, !isFlashing else { return }
+        guard !isFlashing else { return }
+        guard let udid = device?.udid else {
+            errorMessage = L("error.no_iphone_connected", "No iPhone connected.")
+            return
+        }
         guard backedUpCards.contains(id) else {
             errorMessage = L("error.no_backup_for_card", "There is no saved original for this card, so it cannot be restored.")
             return
@@ -1039,6 +1059,9 @@ class AppViewModel: ObservableObject {
                 if restored {
                     self.statusText = L("status.restored", "Card restored. Force-close Wallet to see it.")
                     self.clearCardImage(for: id)
+                    // The phone holds the original artwork again, so no skin
+                    // signature describes this card any more.
+                    self.forgetFlashedSkin(udid: udid, cardId: id)
                 } else {
                     self.statusText = L("status.restore_failed", "Could not restore the card")
                 }

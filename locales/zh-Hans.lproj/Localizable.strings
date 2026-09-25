@@ -82,7 +82,6 @@
 "ui.by" = "作者";
 "ui.cancel" = "取消";
 "ui.card_number" = "卡片 %d";
-"ui.cards_selected_status" = "已选择 %2$d 张中的 %1$d 张 · %3$d 张可刷入";
 "ui.cards_selected_status_changed" = "已选择 %2$d 张中的 %1$d 张 · %3$d 张有改动 · %4$d 张已在 iPhone 上";
 "ui.change" = "更改…";
 "ui.change_image" = "更改图片…";
@@ -132,7 +131,6 @@
 "ui.flash_passcode_theme" = "刷入密码主题";
 "ui.flash_skins" = "刷入皮肤";
 "ui.flash_skins_changed_count" = "刷入皮肤（%d 张有改动）";
-"ui.flash_skins_count" = "刷入皮肤（%d）";
 "ui.flash_to_iphone" = "刷入 iPhone";
 "ui.flashing_cards" = "正在刷入卡片…";
 "ui.flashing_passcode" = "正在刷入密码主题…";
@@ -175,7 +173,6 @@
 "ui.select_all" = "全选";
 "ui.set_skin_for_all" = "统一设置皮肤…";
 "ui.skin_already_on_iphone" = "皮肤已在 iPhone 上";
-"ui.skin_assigned_and_ready" = "皮肤已指定，可以刷入";
 "ui.skin_changed_will_be_flashed" = "皮肤有改动，将刷入";
 "ui.skins_successfully_applied_to_all" = "所有选中的卡片都已应用新皮肤！\n\n请在 iPhone 上强制退出“钱包”App（或重新启动），即可看到新外观。";
 "ui.slice_circle_desc" = "图像会被裁切成一个个圆形按键图标。";

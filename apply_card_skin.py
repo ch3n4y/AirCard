@@ -16,6 +16,8 @@ import time
 import zipfile
 from pathlib import Path
 
+from card_assets import build_card_assets
+
 ROOT = Path(__file__).resolve().parent
 DEVICE_HELPER = ROOT / "bin" / "device_helper" if (ROOT / "bin" / "device_helper").is_file() else ROOT / "build" / "device_helper"
 AIRTRAFFIC_HOST = ROOT / "bin" / "airtraffic_host" if (ROOT / "bin" / "airtraffic_host").is_file() else ROOT / "build" / "airtraffic_host"
@@ -558,20 +560,28 @@ def main():
     print(f"Loaded image from batter: {len(img_data)} bytes")
     print(f"Targeting {len(hashes)} cards on device {udid}...")
 
+    # The combined PDF goes out with the PNGs: Wallet renders the PDF in
+    # preference to them, so a flash that replaced only the PNGs would leave a
+    # card skinned from the app showing its old skin while every file here
+    # reported SUCCESS.
+    try:
+        artwork = build_card_assets(img_data)
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"Error: could not prepare the card artwork: {error}")
+        sys.exit(1)
+
     for index, h in enumerate(hashes, 1):
         target_dir = f"/var/mobile/Library/Passes/Cards/{h}.pkpass"
         print(f"\n[{index}/{len(hashes)}] Processing card: {h}")
 
         print("  -> Writing card artwork (fast batch)...")
-        card_assets = [
-            ("cardBackgroundCombined@3x.png", img_data),
-            ("cardBackgroundCombined@2x.png", img_data),
-        ]
-        ok_batch = write_files_batch(udid, target_dir, card_assets)
+        ok_batch = write_files_batch(udid, target_dir, artwork)
         if not ok_batch:
-            ok3x = write_file(udid, target_dir, "cardBackgroundCombined@3x.png", img_data)
-            ok2x = write_file(udid, target_dir, "cardBackgroundCombined@2x.png", img_data)
-            ok_batch = ok3x and ok2x
+            results = [
+                write_file(udid, target_dir, leaf, payload)
+                for leaf, payload in artwork
+            ]
+            ok_batch = all(results)
         print(f"     Result: {'SUCCESS' if ok_batch else 'FAILED'}")
 
         print("  -> Invalidating pass cache...")

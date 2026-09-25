@@ -63,7 +63,6 @@ from aircard import (
     read_card_backup,
     save_card_backup,
     save_cards,
-    TARGET_ASSETS,
 )
 
 

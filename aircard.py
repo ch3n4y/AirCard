@@ -39,12 +39,12 @@ from apply_card_skin import (
     ROOT,
     DEVICE_HELPER,
 )
-from card_assets import CACHE_FILES, PDF_ASSET_NAME, PNG_ASSET_NAMES
-
-TARGET_ASSETS = [
-    "cardBackgroundCombined@3x.png",
-    "cardBackgroundCombined@2x.png",
-]
+from card_assets import (
+    CACHE_FILES,
+    PDF_ASSET_NAME,
+    PNG_ASSET_NAMES,
+    build_card_assets,
+)
 
 # Everything a flash overwrites, which is what a backup has to cover. Taken from
 # card_assets so the two cannot drift apart: leaving the PDF behind would put the
@@ -438,6 +438,39 @@ def prepare_card_image(input_path: str) -> bytes:
         raise RuntimeError(f"Failed to process image: {e}")
 
 
+def flash_skin_assets(udid: str, card_hashes: list[str], png_bytes: bytes) -> bool:
+    """Writes a skin to each card and clears the rendered faces.
+
+    The combined PDF goes out with the PNGs because Wallet renders the PDF in
+    preference to them. A flash that replaced only the PNGs therefore did
+    nothing at all to a card that had been skinned from the app: the card kept
+    showing its old skin while every file reported OK. These are the same assets
+    the app writes, built the same way.
+    """
+    try:
+        assets = build_card_assets(png_bytes)
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"❌ Could not prepare the card artwork: {error}")
+        return False
+
+    all_ok = True
+    for idx, card_hash in enumerate(card_hashes, 1):
+        print(f"\n--- [{idx}/{len(card_hashes)}] Card: {card_hash} ---")
+        pkpass_dir = f"/var/mobile/Library/Passes/Cards/{card_hash}.pkpass"
+
+        for asset, payload in assets:
+            ok = write_file(udid, pkpass_dir, asset, payload)
+            if not ok:
+                all_ok = False
+            print(f"  -> {asset}: {'OK' if ok else 'FAIL'}")
+
+        ok_cache = invalidate_cache(udid, card_hash)
+        if not ok_cache:
+            all_ok = False
+        print(f"  -> System cache cleared (.cache & .pkcache): {'OK' if ok_cache else 'PARTIAL'}")
+    return all_ok
+
+
 def main():
     print("=" * 60)
     print("🎴 AirCard — Apple Wallet Card Skinner (via airlift)")
@@ -523,18 +556,9 @@ def main():
     # 5. Flash cards
     print(f"\n[5/5] Flashing skin to selected cards ({len(selected_hashes)})...")
 
-    for idx, h in enumerate(selected_hashes, 1):
-        print(f"\n--- [{idx}/{len(selected_hashes)}] Card: {h} ---")
-        pkpass_dir = f"/var/mobile/Library/Passes/Cards/{h}.pkpass"
-
-        for asset in TARGET_ASSETS:
-            ok = write_file(device["udid"], pkpass_dir, asset, png_bytes)
-            status = "OK" if ok else "FAIL"
-            print(f"  -> {asset}: {status}")
-
-        ok_cache = invalidate_cache(device["udid"], h)
-        status = "OK" if ok_cache else "PARTIAL"
-        print(f"  -> System cache cleared (.cache & .pkcache): {status}")
+    if not flash_skin_assets(device["udid"], selected_hashes, png_bytes):
+        print("\n❌ Not every card was updated. See the file list above.")
+        return
 
     print("\n" + "=" * 60)
     print("🎉 DONE! All selected cards successfully updated!")

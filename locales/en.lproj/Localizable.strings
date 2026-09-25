@@ -82,7 +82,6 @@
 "ui.by" = "By";
 "ui.cancel" = "Cancel";
 "ui.card_number" = "Card #%d";
-"ui.cards_selected_status" = "%1$d of %2$d cards selected · %3$d ready to flash";
 "ui.cards_selected_status_changed" = "%1$d of %2$d cards selected · %3$d changed · %4$d already on iPhone";
 "ui.change" = "Change...";
 "ui.change_image" = "Change Image...";
@@ -132,7 +131,6 @@
 "ui.flash_passcode_theme" = "Flash Passcode Theme";
 "ui.flash_skins" = "Flash Skins";
 "ui.flash_skins_changed_count" = "Flash Skins (%d Changed)";
-"ui.flash_skins_count" = "Flash Skins (%d)";
 "ui.flash_to_iphone" = "Flash to iPhone";
 "ui.flashing_cards" = "Flashing Cards...";
 "ui.flashing_passcode" = "Flashing Passcode...";
@@ -175,7 +173,6 @@
 "ui.select_all" = "Select All";
 "ui.set_skin_for_all" = "Set Skin for All...";
 "ui.skin_already_on_iphone" = "Skin already on iPhone";
-"ui.skin_assigned_and_ready" = "Skin assigned and ready";
 "ui.skin_changed_will_be_flashed" = "Skin changed, will be flashed";
 "ui.skins_successfully_applied_to_all" = "Skins successfully applied to all selected cards!\n\nPlease force-close the Wallet app on your iPhone (or reboot) to see your new designs.";
 "ui.slice_circle_desc" = "Artwork is clipped into individual circular button icons.";

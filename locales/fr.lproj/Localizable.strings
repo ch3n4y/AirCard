@@ -82,7 +82,6 @@
 "ui.by" = "Par";
 "ui.cancel" = "Annuler";
 "ui.card_number" = "Carte n° %d";
-"ui.cards_selected_status" = "%1$d sur %2$d cartes sélectionnées · %3$d prêtes à installer";
 "ui.cards_selected_status_changed" = "%1$d sur %2$d cartes sélectionnées · %3$d modifiées · %4$d déjà sur l'iPhone";
 "ui.change" = "Modifier…";
 "ui.change_image" = "Changer d'image…";
@@ -132,7 +131,6 @@
 "ui.flash_passcode_theme" = "Installer le thème de code";
 "ui.flash_skins" = "Installer les habillages";
 "ui.flash_skins_changed_count" = "Installer les habillages (%d modifiés)";
-"ui.flash_skins_count" = "Installer les habillages (%d)";
 "ui.flash_to_iphone" = "Installer sur l'iPhone";
 "ui.flashing_cards" = "Installation des cartes…";
 "ui.flashing_passcode" = "Installation du thème…";
@@ -175,7 +173,6 @@
 "ui.select_all" = "Tout sélectionner";
 "ui.set_skin_for_all" = "Habiller toutes les cartes…";
 "ui.skin_already_on_iphone" = "Habillage déjà sur l'iPhone";
-"ui.skin_assigned_and_ready" = "Habillage attribué · Prêt";
 "ui.skin_changed_will_be_flashed" = "Habillage modifié, sera installé";
 "ui.skins_successfully_applied_to_all" = "Habillages appliqués à toutes les cartes sélectionnées !\n\nForcez la fermeture de Wallet sur votre iPhone (ou redémarrez-le) pour découvrir vos nouveaux visuels.";
 "ui.slice_circle_desc" = "L'illustration est découpée en icônes rondes, une par touche.";

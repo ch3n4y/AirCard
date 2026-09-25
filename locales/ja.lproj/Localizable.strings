@@ -82,7 +82,6 @@
 "ui.by" = "制作";
 "ui.cancel" = "キャンセル";
 "ui.card_number" = "カード%d";
-"ui.cards_selected_status" = "%2$d枚中%1$d枚を選択・%3$d枚が書き込み可能";
 "ui.cards_selected_status_changed" = "%2$d枚中%1$d枚を選択・%3$d枚が変更・%4$d枚が書き込み済み";
 "ui.change" = "変更...";
 "ui.change_image" = "画像を変更...";
@@ -132,7 +131,6 @@
 "ui.flash_passcode_theme" = "パスコードテーマを書き込む";
 "ui.flash_skins" = "スキンを書き込む";
 "ui.flash_skins_changed_count" = "スキンを書き込む（%d枚変更）";
-"ui.flash_skins_count" = "スキンを書き込む（%d枚）";
 "ui.flash_to_iphone" = "iPhoneに書き込む";
 "ui.flashing_cards" = "カードを書き込み中...";
 "ui.flashing_passcode" = "パスコードを書き込み中...";
@@ -175,7 +173,6 @@
 "ui.select_all" = "すべてを選択";
 "ui.set_skin_for_all" = "すべてにスキンを設定...";
 "ui.skin_already_on_iphone" = "スキンは書き込み済み";
-"ui.skin_assigned_and_ready" = "スキン設定済み・準備完了";
 "ui.skin_changed_will_be_flashed" = "スキンが変更されたため書き込みます";
 "ui.skins_successfully_applied_to_all" = "選択したすべてのカードにスキンを適用しました！\n\niPhoneでWalletアプリを強制終了する（または再起動する）と、新しいデザインが表示されます。";
 "ui.slice_circle_desc" = "アートワークを円形のボタンアイコンに切り抜きます。";
