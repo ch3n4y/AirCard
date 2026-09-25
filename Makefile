@@ -30,8 +30,12 @@ install: ## frontend dependencies
 dev: ## run the app with hot reload
 	npm run tauri dev
 
-bundle: ## macOS .app and .dmg into src-tauri/target/release/bundle
+bundle: ## macOS .app and .dmg, then signed and verified
 	npm run tauri build
+	./scripts/sign-macos.sh
+
+sign: ## re-sign and verify an existing bundle
+	./scripts/sign-macos.sh
 
 clean:
 	cargo clean
