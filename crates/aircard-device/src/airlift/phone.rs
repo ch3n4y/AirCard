@@ -875,3 +875,27 @@ fn a_read_whose_file_never_arrived_takes_its_staging_back_down() {
         "with nothing in the staging, the phone has to be exactly as it was"
     );
 }
+
+#[test]
+fn a_sync_list_holding_a_card_file_is_cleared_too() {
+    // Not every failure leaves the staging name behind: an attempt that got as far
+    // as moving the link leaves a row naming the card file instead, and that row
+    // blocks the card just as thoroughly.
+    let phone = Phone::new();
+    phone.add_card(b"the artwork the card came with");
+    let database = format!("{MEDIA}/Books/Sync/Database/OutstandingAssets_4.sqlite");
+    phone.add_file(
+        &database,
+        b"\x00../../../Library/Passes/Cards/TestCard.pkpass/cardBackgroundCombined@3x.png\x00",
+    );
+
+    phone
+        .airlift()
+        .read_file(CARD, ARTWORK[0], 1)
+        .expect("the read should have worked");
+
+    assert!(
+        phone.device().file(&database).is_none(),
+        "a card file in the phone's download list is this app's doing"
+    );
+}

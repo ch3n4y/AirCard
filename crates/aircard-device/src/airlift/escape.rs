@@ -34,7 +34,7 @@
 //!   it and names it rather than tidying it away.
 
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use aircard_apple_ffi::DeviceError;
 
@@ -61,6 +61,16 @@ const SETTLE: Duration = Duration::from_secs(2);
 /// The pause between retries, multiplied by the attempt number.
 const PACE: Duration = Duration::from_millis(300);
 
+/// How long to keep looking for a file the phone said it had moved.
+///
+/// The phone's move is not finished when it says it is: a few megabytes take a
+/// moment to appear in Media, and asking once and too early finds nothing -- and
+/// concluding from that the file never arrived is what leaves a card without it.
+/// The previous implementation waited up to fifteen seconds here, which is where
+/// this number comes from.
+const READ_BACK_PATIENCE: Duration = Duration::from_secs(15);
+const READ_BACK_STEP: Duration = Duration::from_millis(250);
+
 /// The payload a read puts in the archive. Its contents never reach the phone's
 /// card directory -- the archive exists for its symlink -- but a zip entry needs
 /// bytes, and naming them makes a staging tree on a phone legible.
@@ -83,6 +93,14 @@ const SYNC_DATABASE_PREFIX: &str = "OutstandingAssets";
 /// The largest sync database this app will read looking for its own traces. The
 /// real one is tens of kilobytes.
 const SYNC_DATABASE_LIMIT: u64 = 8 * 1024 * 1024;
+
+/// What the phone's sync list looks like when the traces are this app's.
+///
+/// Two names, because an interrupted attempt leaves one or the other: its own
+/// staging, or the card file it was moving. A book sync has no business fetching
+/// anything out of `Passes/Cards` -- those entries only ever get there because the
+/// escape put them there -- so both are safe to call ours.
+const SYNC_TRACES: [&str; 2] = [payload::SOURCE_PREFIX, "Passes/Cards"];
 
 /// What a path is, as far as the phone will say.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -825,11 +843,11 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
     /// gets put back at the end, and putting back a stale list of assets is
     /// exactly the state this is here to get out of.
     ///
-    /// The record names this app's own staging when it is stale, which is the test
-    /// for clearing it: a list that names real content belongs to somebody else's
-    /// download and is left alone. There is no way to remove one entry -- the file
-    /// is a database and this app carries no database library -- so the whole file
-    /// goes and the phone makes a new one.
+    /// The record names this app's own staging or a card file when it is stale,
+    /// which is the test for clearing it: a list that names neither belongs to
+    /// somebody else's download and is left alone. There is no way to remove one
+    /// entry -- the file is a database and this app carries no database library --
+    /// so the whole file goes and the phone makes a new one.
     fn clear_stale_sync_state(&self) -> Result<()> {
         let mut media = self.source.open()?;
         let Ok(names) = media.list(SYNC_DATABASE) else {
@@ -840,11 +858,15 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
             .filter(|name| name.starts_with(SYNC_DATABASE_PREFIX))
             .map(|name| format!("{SYNC_DATABASE}/{name}"))
             .collect();
-        let ours = payload::SOURCE_PREFIX.as_bytes();
         let stale = database.iter().any(|path| {
             media
                 .read(path, SYNC_DATABASE_LIMIT)
-                .map(|bytes| bytes.windows(ours.len()).any(|window| window == ours))
+                .map(|bytes| {
+                    SYNC_TRACES.iter().any(|trace| {
+                        let needle = trace.as_bytes();
+                        bytes.windows(needle.len()).any(|window| window == needle)
+                    })
+                })
                 .unwrap_or(false)
         });
         if !stale {
@@ -884,16 +906,22 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
 
     fn read_moved(&self, recovered: &str) -> Result<Vec<u8>> {
         let mut media = self.source.open()?;
-        if !media.exists(recovered) {
-            return Err(AirliftError::Unreadable {
-                path: recovered.to_owned(),
-            });
+        let deadline = Instant::now() + READ_BACK_PATIENCE;
+        loop {
+            if media.exists(recovered) {
+                if let Ok(bytes) = media.read(recovered, EXPORT_LIMIT) {
+                    if !bytes.is_empty() {
+                        return Ok(bytes);
+                    }
+                }
+            }
+            if Instant::now() >= deadline {
+                return Err(AirliftError::Unreadable {
+                    path: recovered.to_owned(),
+                });
+            }
+            sleep(READ_BACK_STEP);
         }
-        media
-            .read(recovered, EXPORT_LIMIT)
-            .map_err(|_| AirliftError::Unreadable {
-                path: recovered.to_owned(),
-            })
     }
 
     /// Takes the staging tree and the first two names away and restores the
