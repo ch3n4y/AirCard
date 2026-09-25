@@ -647,6 +647,24 @@ class AppViewModel: ObservableObject {
         formatter.dateFormat = "HH:mm:ss"
         let timestamp = formatter.string(from: Date())
         logs.append("[\(timestamp)] \(message)")
+        AppViewModel.appendToLogFile("[\(timestamp)] \(message)")
+    }
+
+    /// The log panel lives in memory, so anything worth looking at afterwards --
+    /// an empty card list, say -- would leave no trace once the app quits.
+    nonisolated private static func appendToLogFile(_ line: String) {
+        let directory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs", isDirectory: true)
+        let url = directory.appendingPathComponent("AirCard.log")
+        guard let data = (line + "\n").data(using: .utf8) else { return }
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        } else {
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try? data.write(to: url)
+        }
     }
     
     nonisolated private static var pythonExecutableURL: URL {
@@ -953,7 +971,14 @@ class AppViewModel: ObservableObject {
         // clear on first launch, which keeps the restored saved cards.
         if let current = device?.udid, current != udid {
             if isScanningCards { stopCardScanning() }
+            // These hashes belong to the phone that was selected a moment ago, so
+            // they must not be flashed onto this one. Persist and say so here: this
+            // used to happen silently, just emptied in memory, and a phone that
+            // drops off and comes back reads as a switch -- which left nothing in
+            // the log to explain where the card list went.
+            log("Device changed from \(current.prefix(12))... to \(udid.prefix(12))... — dropping \(cards.count) card(s) saved for the other iPhone.")
             cards.removeAll()
+            saveCards()
         }
 
         isCheckingDevice = true
