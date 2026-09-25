@@ -1388,6 +1388,138 @@ mod afc_tests {
         assert!(session.list(outside).is_err(), "traversal must be refused");
         assert!(!session.exists(outside));
     }
+
+    #[test]
+    #[ignore = "needs an iPhone attached"]
+    fn the_phone_is_found_on_a_different_thread_from_the_one_that_listed_it() {
+        // The window's own shape: the device list is asked for while the page is
+        // loading, on one thread of the pool, and every later command runs on
+        // whichever thread the pool hands out -- which is almost never the same
+        // one. Notification callbacks arrive on the run loop of the thread that
+        // subscribed, so a subscription made somewhere else has to be able to
+        // find the phone too.
+        let udid = test_device();
+        let listed = list_devices().expect("discovery runs");
+        assert!(!listed.is_empty(), "a phone has to be plugged in");
+        println!("this thread listed {} device(s)", listed.len());
+
+        // On a thread that has never spoken to the framework before.
+        let elsewhere = std::thread::spawn({
+            let udid = udid.clone();
+            move || -> Result<(), DeviceError> {
+                let session = AfcSession::open(&udid)?;
+                drop(session);
+                Ok(())
+            }
+        })
+        .join()
+        .expect("the thread finishes");
+        elsewhere.expect("a session on a thread that has not listed devices");
+
+        // And once more here, after both.
+        let session = AfcSession::open(&udid).expect("a session on the thread that listed");
+        drop(session);
+    }
+
+    #[test]
+    #[ignore = "needs an iPhone attached"]
+    fn the_phone_is_found_after_a_scan_has_run() {
+        // The window scans for cards and then reads one, one after the other, in
+        // the same process. The scan holds a session of its own for as long as it
+        // runs, and what it leaves behind when it is told to stop must not stop
+        // the next thing from finding the phone -- which is what went wrong when
+        // the window was first clicked through by hand.
+        let udid = test_device();
+
+        // On this thread first: open the log stream, read a little, close it.
+        let mut stream = LogStream::open(&udid).expect("the log stream opens");
+        let mut read = 0;
+        while read < 20 {
+            match stream.next_line() {
+                Ok(Some(_)) => read += 1,
+                Ok(None) => continue,
+                Err(error) => panic!("the stream ended after {read} lines: {error}"),
+            }
+        }
+        drop(stream);
+
+        let session = AfcSession::open(&udid).expect("AFC opens after a scan on this thread");
+        drop(session);
+
+        // And then the other way round: the scan runs on a thread of its own,
+        // exactly as `start_scan` spawns it, and the read happens afterwards on
+        // this one.
+        let scanned = std::thread::spawn({
+            let udid = udid.clone();
+            move || -> Result<(), DeviceError> {
+                let mut stream = LogStream::open(&udid)?;
+                let mut read = 0;
+                while read < 20 {
+                    match stream.next_line()? {
+                        Some(_) => read += 1,
+                        None => continue,
+                    }
+                }
+                Ok(())
+            }
+        })
+        .join()
+        .expect("the thread finishes");
+        scanned.expect("a scan on a thread of its own");
+
+        let session = AfcSession::open(&udid).expect("AFC opens after a scan on another thread");
+        drop(session);
+    }
+
+    #[test]
+    #[ignore = "needs an iPhone attached"]
+    fn the_phone_is_found_from_every_kind_of_thread() {
+        // The window asks for the phone from whichever thread its pool hands out,
+        // and a pool thread is reused all day -- so "found on this thread, once"
+        // is not the property that matters. Each case below is a situation the
+        // window is actually in.
+        let udid = test_device();
+
+        // The one the window is in first: list what is plugged in.
+        let listed = list_devices().expect("discovery runs");
+        assert!(!listed.is_empty(), "a phone has to be plugged in");
+
+        // Twice on the thread that has just listed them.
+        for attempt in 1..=2 {
+            let session = AfcSession::open(&udid).unwrap_or_else(|error| {
+                panic!("attempt {attempt} on a thread that listed devices: {error}")
+            });
+            drop(session);
+        }
+
+        // A session stays on the thread that opened it -- it is deliberately not
+        // `Send`, because the framework's run loop is per thread -- so each case
+        // opens and closes its own and reports only whether it worked.
+        let attempt = |label: &'static str, before: bool| {
+            let udid = udid.clone();
+            std::thread::spawn(move || -> Result<(), DeviceError> {
+                if before {
+                    list_devices()?;
+                }
+                let session = AfcSession::open(&udid)?;
+                drop(session);
+                let again = AfcSession::open(&udid)?;
+                drop(again);
+                Ok(())
+            })
+            .join()
+            .unwrap_or_else(|_| panic!("{label}: the thread panicked"))
+            .unwrap_or_else(|error| panic!("{label}: {error}"))
+        };
+
+        // A thread of its own, twice over: two commands in a row.
+        attempt("a thread of its own", false);
+
+        // And a thread that lists the devices before asking for one, which is
+        // what every pool thread has done by the time a person has clicked
+        // anything.
+        attempt("a thread that has listed devices", true);
+    }
 }
 
 /// Framing and record decoding, driven from memory instead of from a device.

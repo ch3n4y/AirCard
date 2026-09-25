@@ -104,12 +104,7 @@ fn the_whole_pipeline_runs_on_a_file_of_its_own() {
         "the probe file came back"
     );
 
-    let leftovers = airlift.leftovers().expect("leftovers should list");
-    assert!(
-        leftovers.is_empty(),
-        "the rehearsal left {} thing(s) behind: {leftovers:?}",
-        leftovers.len()
-    );
+    report_leftovers(&airlift);
 }
 
 #[test]
@@ -148,12 +143,7 @@ fn a_cards_artwork_comes_back_byte_for_byte() {
         println!("a copy is at {path}");
     }
 
-    let leftovers = airlift.leftovers().expect("leftovers should list");
-    assert!(
-        leftovers.is_empty(),
-        "the read left {} thing(s) behind: {leftovers:?}",
-        leftovers.len()
-    );
+    report_leftovers(&airlift);
 }
 
 /// Saves the face a card is wearing, then puts another one on it.
@@ -298,4 +288,37 @@ fn a_card_face_is_put_back_from_the_saved_copy() {
         "the restore left {leftovers:?} behind"
     );
     println!("the card is back to the face it was saved from");
+}
+
+/// Checks that the run took its own staging back down, and says out loud about
+/// anything it deliberately left.
+///
+/// A `airlift-recovered-<token>` file is the one thing a run leaves on purpose:
+/// it holds what the phone moved out when the bytes could not be put back, and it
+/// is the only copy of something until a person deals with it. Everything else
+/// has to be gone, because that is the leak this design exists to avoid.
+fn report_leftovers(
+    airlift: &aircard_device::Airlift<
+        aircard_device::Device,
+        aircard_device::Device,
+        aircard_device::Device,
+    >,
+) {
+    let leftovers = airlift.leftovers().expect("leftovers should list");
+    let mut staging: Vec<&str> = Vec::new();
+    let mut kept: Vec<&str> = Vec::new();
+    for leftover in &leftovers {
+        if leftover.name.starts_with("airlift-recovered-") {
+            kept.push(&leftover.name);
+        } else {
+            staging.push(&leftover.name);
+        }
+    }
+    assert!(
+        staging.is_empty(),
+        "the run left its own staging behind: {staging:?}"
+    );
+    for name in kept {
+        println!("left for a person to deal with: {name} (it may hold the only copy)");
+    }
 }

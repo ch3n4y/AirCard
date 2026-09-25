@@ -73,6 +73,17 @@ const REMOVE_PLACEHOLDER: &[u8] = b"aircard-v2";
 /// The deepest staging tree that will be walked during cleanup.
 const TREE_LIMIT: u32 = 32;
 
+/// Where the phone records the assets it is still waiting for.
+///
+/// The file's name has changed between releases, so the directory is what is
+/// looked in and the prefix is what is matched.
+const SYNC_DATABASE: &str = "Books/Sync/Database";
+const SYNC_DATABASE_PREFIX: &str = "OutstandingAssets";
+
+/// The largest sync database this app will read looking for its own traces. The
+/// real one is tens of kilobytes.
+const SYNC_DATABASE_LIMIT: u64 = 8 * 1024 * 1024;
+
 /// What a path is, as far as the phone will say.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -332,6 +343,7 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
 
     fn read_once(&self, target: &str, leaf: &str, path: &str) -> Result<ReadBack> {
         let plan = Staging::new();
+        self.clear_stale_sync_state()?;
         let ledger = self.snapshot()?;
         let assets = vec![plan.link_asset(), airlock_relative(path)];
         let destinations = vec![plan.link(), plan.recovered()];
@@ -360,12 +372,26 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
         let data = match self.read_moved(&plan.recovered()) {
             Ok(data) => data,
             Err(error) => {
-                // The phone moved the file and that is the only copy of it left,
-                // so the staging tree stays where it is and a person is told
-                // about it. The ledger is a different matter: the phone folds
-                // what was staged into its own library file, and an entry naming
-                // an asset that will never arrive outlives the run. So the ledger
-                // goes back, and everything else is left exactly where it is.
+                // Which of two very different things happened is decided by
+                // whether anything arrived. Nothing did: the phone answered but
+                // the file it was told to move is not there (it is missing on the
+                // phone, which is what a card looks like after an attempt that was
+                // cut short). Then the staging holds nothing of anybody's and is
+                // taken back down, or every attempt would leave more of it behind.
+                let nothing_arrived = {
+                    let mut media = self.source.open()?;
+                    !media.exists(&plan.recovered())
+                };
+                if nothing_arrived {
+                    let cleanup = self.finish(&plan, &ledger, true);
+                    return Err(with_cleanup(error, cleanup));
+                }
+                // Something did arrive, and that is the only copy of it left, so
+                // the staging tree stays where it is and a person is told about
+                // it. The ledger is a different matter: the phone folds what was
+                // staged into its own library file, and an entry naming an asset
+                // that will never arrive outlives the run. So the ledger goes
+                // back, and everything else is left exactly where it is.
                 sleep(SETTLE);
                 let failures = self.restore_ledger(&ledger);
                 return Err(with_cleanup(
@@ -425,6 +451,7 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
 
     fn write_once(&self, target: &str, files: &[(String, Vec<u8>)]) -> Result<()> {
         let plan = Staging::new();
+        self.clear_stale_sync_state()?;
         let ledger = self.snapshot()?;
         let mut assets = vec![plan.link_asset()];
         let mut destinations = vec![plan.link()];
@@ -491,6 +518,7 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
 
     fn remove_once(&self, target: &str, leaves: &[String]) -> Result<()> {
         let plan = Staging::new();
+        self.clear_stale_sync_state()?;
         let ledger = self.snapshot()?;
         let archive = build_archive(target, REMOVE_PLACEHOLDER);
 
@@ -792,6 +820,48 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
 
     /// The first payload still sitting in the staging tree, if the phone left
     /// one behind.
+    /// Removes the phone's record of assets this app staged and never finished,
+    /// and it has to happen before the ledger is read: the ledger snapshot is what
+    /// gets put back at the end, and putting back a stale list of assets is
+    /// exactly the state this is here to get out of.
+    ///
+    /// The record names this app's own staging when it is stale, which is the test
+    /// for clearing it: a list that names real content belongs to somebody else's
+    /// download and is left alone. There is no way to remove one entry -- the file
+    /// is a database and this app carries no database library -- so the whole file
+    /// goes and the phone makes a new one.
+    fn clear_stale_sync_state(&self) -> Result<()> {
+        let mut media = self.source.open()?;
+        let Ok(names) = media.list(SYNC_DATABASE) else {
+            return Ok(());
+        };
+        let database: Vec<String> = names
+            .into_iter()
+            .filter(|name| name.starts_with(SYNC_DATABASE_PREFIX))
+            .map(|name| format!("{SYNC_DATABASE}/{name}"))
+            .collect();
+        let ours = payload::SOURCE_PREFIX.as_bytes();
+        let stale = database.iter().any(|path| {
+            media
+                .read(path, SYNC_DATABASE_LIMIT)
+                .map(|bytes| bytes.windows(ours.len()).any(|window| window == ours))
+                .unwrap_or(false)
+        });
+        if !stale {
+            return Ok(());
+        }
+        let mut failures = Vec::new();
+        for path in &database {
+            remove_if_present(&mut *media, path, &mut failures);
+        }
+        if failures.is_empty() {
+            log_stale_sync_cleared(&database);
+            Ok(())
+        } else {
+            Err(AirliftError::Cleanup { failures })
+        }
+    }
+
     /// The first payload this app asked for that is still in the staging tree.
     ///
     /// A move takes the source away, so a payload still sitting there is a move
@@ -889,6 +959,15 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
         }
         Err(last.expect("every path above records the error it is leaving with"))
     }
+}
+
+/// Says out loud that a phone's sync list was cleared, because that is the
+/// explanation for a run that suddenly starts working.
+fn log_stale_sync_cleared(database: &[String]) {
+    eprintln!(
+        "aircard: cleared the phone's stale sync list ({})",
+        database.join(", ")
+    );
 }
 
 /// The path AirTraffic needs, which starts from the Airlock root rather than

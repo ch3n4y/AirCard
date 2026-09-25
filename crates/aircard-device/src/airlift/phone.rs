@@ -802,3 +802,76 @@ fn a_move_the_phone_acknowledged_and_did_not_do_is_not_a_silent_success() {
     );
     assert!(leftovers_of(&phone).is_empty());
 }
+
+#[test]
+fn a_stale_sync_list_naming_this_apps_staging_is_cleared_before_the_ledger_is_read() {
+    let phone = Phone::new();
+    phone.add_card(b"the artwork the card came with");
+    // What a phone is left holding after an attempt that never finished. It then
+    // answers a request to move that asset with success and moves nothing, and it
+    // keeps doing that until the list is cleared.
+    let database = format!("{MEDIA}/Books/Sync/Database/OutstandingAssets_4.sqlite");
+    phone.add_file(
+        &database,
+        b"\x00\x00airlift-src-00112233445566778899\x00\x00",
+    );
+    phone.add_file(
+        &format!("{database}-wal"),
+        b"\x00\x00airlift-src-00112233445566778899\x00\x00",
+    );
+
+    phone
+        .airlift()
+        .read_file(CARD, ARTWORK[0], 1)
+        .expect("the read should have worked");
+
+    let fs = phone.device();
+    assert!(
+        fs.file(&database).is_none(),
+        "the stale list has to go, or that asset can never be moved again"
+    );
+    assert!(fs.file(&format!("{database}-wal")).is_none());
+}
+
+#[test]
+fn a_sync_list_naming_somebody_elses_download_is_left_alone() {
+    let phone = Phone::new();
+    phone.add_card(b"the artwork the card came with");
+    let database = format!("{MEDIA}/Books/Sync/Database/OutstandingAssets_4.sqlite");
+    phone.add_file(&database, b"\x00\x00chapter-three-of-a-book\x00\x00");
+
+    phone
+        .airlift()
+        .read_file(CARD, ARTWORK[0], 1)
+        .expect("the read should have worked");
+
+    assert!(
+        phone.device().file(&database).is_some(),
+        "a list that is not about this app's staging is somebody's download"
+    );
+}
+
+#[test]
+fn a_read_whose_file_never_arrived_takes_its_staging_back_down() {
+    // The common case on a phone where a card's file has gone missing: the phone
+    // answers, moves nothing, and an attempt that tidied up after itself leaves
+    // the phone as it found it.
+    let phone = Phone::new();
+    phone.add_card(b"the artwork the card came with");
+    let before = phone.device();
+
+    // The phone answers that it moved the file and moves nothing, which is what
+    // it does for a file that is not there.
+    phone.plans(&[Plan::Ignored]);
+    let error = phone
+        .airlift()
+        .read_file(CARD, ARTWORK[0], 1)
+        .expect_err("a file that never arrives is not a read");
+
+    assert!(matches!(error, AirliftError::Unreadable { .. }), "{error}");
+    assert_eq!(
+        phone.device(),
+        before,
+        "with nothing in the staging, the phone has to be exactly as it was"
+    );
+}
