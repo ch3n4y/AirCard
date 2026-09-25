@@ -2752,8 +2752,7 @@ struct ContentView: View {
                     Label(L("ui.scan_record", "Scan Record"),
                           systemImage: vm.lastScanSeen.isEmpty ? "questionmark.circle" : "checklist")
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
+                .menuStyle(.button)
                 .controlSize(.regular)
                 .help(vm.lastScanSeen.isEmpty
                       ? L("ui.scan_record", "Scan Record")
