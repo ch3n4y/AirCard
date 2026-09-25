@@ -6,6 +6,7 @@
 "bold.short_bold" = "太字";
 "bold.short_both" = "標準＋太字";
 "bold.short_regular" = "標準";
+"error.could_not_read_card_artwork" = "このカードの画像を読み込めませんでした。ログを確認してください。";
 "error.could_not_read_picked_image" = "選択した画像をいずれかのカードで読み込めませんでした。そのカードは変更していません。";
 "error.could_not_run_device_tools" = "AirCard はデバイスツールを実行できませんでした。アプリが破損しているか、不完全にインストールされている可能性があります。";
 "error.failed_to_inspect_passthm_file" = ".passthmファイルの内容を確認できませんでした";
@@ -55,6 +56,7 @@
 "status.passcode_theme_applied_successfully" = "パスコードテーマを適用しました！";
 "status.poster_image_loaded_ready_to" = "ポスター画像を読み込みました・位置を調整して分割できます";
 "status.preparing_skin" = "[%1$d/%2$d] %3$@のスキンを準備しています...";
+"status.reading_artwork" = "カード画像を読み込み中…";
 "status.ready" = "準備完了";
 "status.restore_failed" = "カードを復元できませんでした";
 "status.restored" = "カードを復元しました。Walletアプリを強制終了すると反映されます。";
@@ -156,6 +158,8 @@
 "ui.paste_one_or_more_card" = "カードハッシュを1つ以上ペーストしてください（スペース、カンマ、改行で区切ります）：";
 "ui.percent" = "%d%%";
 "ui.poster_artwork" = "ポスターのアートワーク";
+"ui.read_artwork_from_iphone" = "iPhoneからカード画像を読み込む";
+"ui.read_artwork_help" = "このカードの画像を一覧に表示します。読み込み時はファイルをiPhoneから移動して書き戻すため、1分ほどかかります。";
 "ui.reflash_all_count" = "すべて再書き込み（%d枚）";
 "ui.refresh_device_connection" = "デバイスの接続を再確認";
 "ui.remove" = "削除";

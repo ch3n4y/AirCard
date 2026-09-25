@@ -6,6 +6,7 @@
 "bold.short_bold" = "Bold";
 "bold.short_both" = "Regular + Bold";
 "bold.short_regular" = "Regular";
+"error.could_not_read_card_artwork" = "Could not read this card's artwork. See the log.";
 "error.could_not_read_picked_image" = "AirCard could not read the image you picked for one of the cards. That card was left unchanged.";
 "error.could_not_run_device_tools" = "AirCard could not run its device tools. The app may be damaged or incompletely installed.";
 "error.failed_to_inspect_passthm_file" = "Failed to inspect .passthm file";
@@ -55,6 +56,7 @@
 "status.passcode_theme_applied_successfully" = "Passcode theme applied successfully!";
 "status.poster_image_loaded_ready_to" = "Poster image loaded · Ready to frame and slice";
 "status.preparing_skin" = "[%1$d/%2$d] Preparing skin for %3$@...";
+"status.reading_artwork" = "Reading the card's artwork...";
 "status.ready" = "Ready";
 "status.restore_failed" = "Could not restore the card";
 "status.restored" = "Card restored. Force-close Wallet to see it.";
@@ -156,6 +158,8 @@
 "ui.paste_one_or_more_card" = "Paste one or more card hashes (separated by spaces, commas, or newlines):";
 "ui.percent" = "%d%%";
 "ui.poster_artwork" = "Poster Artwork";
+"ui.read_artwork_from_iphone" = "Read Artwork from iPhone";
+"ui.read_artwork_help" = "Show this card's artwork in the list. Reading it moves the file off the iPhone and writes it back, so it takes a minute.";
 "ui.reflash_all_count" = "Re-flash All (%d)";
 "ui.refresh_device_connection" = "Refresh device connection";
 "ui.remove" = "Remove";

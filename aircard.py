@@ -99,6 +99,37 @@ def card_backup_dir(udid: str, card_hash: str) -> Path:
     return BACKUPS_ROOT / _backup_slug(udid) / _backup_slug(card_hash)
 
 
+# A picture of a card, so the app can tell one row from another. Only cards with
+# no saved original need a copy here: a backup is preferred when it exists.
+ARTWORK_CACHE_ROOT = Path.home() / ".aircard_cache"
+
+
+def card_artwork_cache_dir(udid: str, card_hash: str) -> Path:
+    return ARTWORK_CACHE_ROOT / _backup_slug(udid) / _backup_slug(card_hash)
+
+
+def forget_card_artwork(udid: str, card_hash: str) -> None:
+    """Drops a cached picture, for when a card's artwork has changed."""
+    shutil.rmtree(card_artwork_cache_dir(udid, card_hash), ignore_errors=True)
+
+
+def card_artwork_file(directory: Path) -> "Path | None":
+    """The first file in ``directory`` the app can draw, or None.
+
+    Drawn in ``BACKED_UP_ASSETS`` order, so the PNGs win over the PDF. The PDF
+    still counts: a card the tool has never touched may carry only that, and
+    NSImage renders it as readily as a PNG.
+    """
+    for asset in BACKED_UP_ASSETS:
+        candidate = directory / asset
+        try:
+            if candidate.is_file() and candidate.stat().st_size > 0:
+                return candidate
+        except OSError:
+            continue
+    return None
+
+
 def _backup_is_complete(d: Path) -> bool:
     """True only when every file a flash overwrites is present in the backup.
 

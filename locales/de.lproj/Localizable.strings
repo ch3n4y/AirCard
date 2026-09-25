@@ -6,6 +6,7 @@
 "bold.short_bold" = "Fett";
 "bold.short_both" = "Normal + Fett";
 "bold.short_regular" = "Normal";
+"error.could_not_read_card_artwork" = "Die Grafik dieser Karte konnte nicht gelesen werden. Siehe Protokoll.";
 "error.could_not_read_picked_image" = "AirCard konnte das gewählte Bild für eine der Karten nicht lesen. Diese Karte wurde nicht geändert.";
 "error.could_not_run_device_tools" = "AirCard konnte die Gerätewerkzeuge nicht ausführen. Die App ist möglicherweise beschädigt oder unvollständig installiert.";
 "error.failed_to_inspect_passthm_file" = ".passthm-Datei konnte nicht gelesen werden";
@@ -55,6 +56,7 @@
 "status.passcode_theme_applied_successfully" = "Code-Design erfolgreich angewendet!";
 "status.poster_image_loaded_ready_to" = "Posterbild geladen · Bereit zum Ausrichten und Zerlegen";
 "status.preparing_skin" = "[%1$d/%2$d] Skin für %3$@ wird vorbereitet …";
+"status.reading_artwork" = "Kartengrafik wird gelesen …";
 "status.ready" = "Bereit";
 "status.restore_failed" = "Karte konnte nicht wiederhergestellt werden";
 "status.restored" = "Karte wiederhergestellt. Beende die Wallet-App vollständig, um die Karte zu sehen.";
@@ -156,6 +158,8 @@
 "ui.paste_one_or_more_card" = "Füge einen oder mehrere Karten-Hashes ein (getrennt durch Leerzeichen, Kommas oder Zeilenumbrüche):";
 "ui.percent" = "%d %%";
 "ui.poster_artwork" = "Postergrafik";
+"ui.read_artwork_from_iphone" = "Grafik vom iPhone lesen";
+"ui.read_artwork_help" = "Zeigt die Grafik dieser Karte in der Liste. Beim Lesen wird die Datei vom iPhone verschoben und zurückgeschrieben, das dauert etwa eine Minute.";
 "ui.reflash_all_count" = "Alle erneut aufspielen (%d)";
 "ui.refresh_device_connection" = "Geräteverbindung aktualisieren";
 "ui.remove" = "Entfernen";

@@ -6,6 +6,7 @@
 "bold.short_bold" = "굵게";
 "bold.short_both" = "일반 + 굵게";
 "bold.short_regular" = "일반";
+"error.could_not_read_card_artwork" = "이 카드의 이미지를 읽지 못했습니다. 로그를 확인하세요.";
 "error.could_not_read_picked_image" = "선택한 이미지를 카드 중 하나에서 읽지 못했습니다. 해당 카드는 변경하지 않았습니다.";
 "error.could_not_run_device_tools" = "AirCard가 기기 도구를 실행하지 못했습니다. 앱이 손상되었거나 불완전하게 설치되었을 수 있습니다.";
 "error.failed_to_inspect_passthm_file" = ".passthm 파일을 확인하지 못했습니다";
@@ -55,6 +56,7 @@
 "status.passcode_theme_applied_successfully" = "암호 테마를 적용했습니다!";
 "status.poster_image_loaded_ready_to" = "포스터 이미지 불러옴 · 구도 조정 및 분할 준비 완료";
 "status.preparing_skin" = "[%1$d/%2$d] %3$@ 스킨 준비 중...";
+"status.reading_artwork" = "카드 이미지를 읽는 중…";
 "status.ready" = "준비됨";
 "status.restore_failed" = "카드를 복원하지 못했습니다";
 "status.restored" = "카드를 복원했습니다 · 지갑 앱을 강제 종료하면 원래 디자인이 나타납니다";
@@ -156,6 +158,8 @@
 "ui.paste_one_or_more_card" = "카드 해시를 하나 이상 붙여넣으십시오(공백, 쉼표, 줄바꿈으로 구분):";
 "ui.percent" = "%d%%";
 "ui.poster_artwork" = "포스터 아트워크";
+"ui.read_artwork_from_iphone" = "iPhone에서 카드 이미지 읽기";
+"ui.read_artwork_help" = "이 카드의 이미지를 목록에 표시합니다. 읽을 때 파일을 iPhone 밖으로 옮겼다가 다시 쓰기 때문에 1분 정도 걸립니다.";
 "ui.reflash_all_count" = "전체 다시 적용 (%d개)";
 "ui.refresh_device_connection" = "기기 연결 새로 고침";
 "ui.remove" = "제거";

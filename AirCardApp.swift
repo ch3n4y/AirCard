@@ -581,6 +581,11 @@ class AppViewModel: ObservableObject {
     @Published var devices: [DeviceInfo] = []
     // Cards whose original artwork is saved on this Mac, so restore is real.
     @Published var backedUpCards: Set<String> = []
+
+    /// A picture of each card, so one row can be told apart from another. Keyed by
+    /// card hash; a missing entry means nothing is known about that card yet.
+    @Published var cardArtwork: [String: NSImage] = [:]
+    @Published var artworkBeingRead: Set<String> = []
     @Published var isCheckingDevice = false
     @Published var isScanningCards = false
     @Published var cards: [CardItem] = []
@@ -986,8 +991,119 @@ class AppViewModel: ObservableObject {
             let list = data.flatMap { try? JSONDecoder().decode(SavedCardsResponse.self, from: $0) }
             await MainActor.run {
                 self.backedUpCards = Set(list?.cards ?? [])
+                self.loadCardArtwork(for: self.cards.map(\.id))
             }
         }
+    }
+
+    /// Loads whatever artwork is already on this Mac: the saved original first,
+    /// then a copy an earlier read left behind. Nothing is asked of the phone, so
+    /// this is cheap enough to run for every card as soon as the list is known.
+    func loadCardArtwork(for ids: [String]) {
+        guard let udid = device?.udid else { return }
+        let wanted = ids.filter { cardArtwork[$0] == nil && !artworkBeingRead.contains($0) }
+        guard !wanted.isEmpty else { return }
+        let scriptDir = self.scriptDir
+        artworkBeingRead.formUnion(wanted)
+        Task.detached {
+            for id in wanted {
+                let data = AppViewModel.runBackend(
+                    ["aircard_backend.py", "--artwork", udid, id], scriptDir: scriptDir)
+                let path = AppViewModel.artworkPath(from: data)
+                await MainActor.run {
+                    self.artworkBeingRead.remove(id)
+                    // Loaded here, on the main actor: NSImage is not Sendable and
+                    // must not be carried back out of the worker.
+                    if let path = path, let image = NSImage(contentsOfFile: path) {
+                        self.cardArtwork[id] = image
+                    }
+                }
+            }
+        }
+    }
+
+    /// Reads one card's artwork off the phone, because the user asked for it.
+    ///
+    /// Opt-in on purpose: the read moves the file off the card and writes it back,
+    /// which takes about a minute and is not something to do behind anyone's back.
+    func readArtworkFromPhone(cardId: String) {
+        guard !isFlashing else { return }
+        guard let udid = device?.udid else {
+            errorMessage = L("error.no_iphone_connected", "No iPhone connected.")
+            return
+        }
+        guard !artworkBeingRead.contains(cardId) else { return }
+        errorMessage = nil
+        statusText = L("status.reading_artwork", "Reading the card's artwork...")
+        artworkBeingRead.insert(cardId)
+        let scriptDir = self.scriptDir
+        Task.detached {
+            let data = AppViewModel.runBackend(
+                ["aircard_backend.py", "--artwork", udid, cardId, "--fetch"], scriptDir: scriptDir)
+            let path = AppViewModel.artworkPath(from: data)
+            let said = data.flatMap { AppViewModel.artworkFailureMessage(from: $0) }
+            await MainActor.run {
+                self.artworkBeingRead.remove(cardId)
+                self.statusText = L("status.ready", "Ready")
+                if let path = path, let image = NSImage(contentsOfFile: path) {
+                    self.cardArtwork[cardId] = image
+                } else {
+                    self.errorMessage = L("error.could_not_read_card_artwork",
+                                          "Could not read this card's artwork. See the log.")
+                    if let said = said { self.log("  \(said)") }
+                }
+            }
+        }
+    }
+
+    /// A card's artwork changed on the phone, so what is cached for it is stale.
+    func refreshArtwork(for ids: [String]) {
+        guard let udid = device?.udid else { return }
+        let scriptDir = self.scriptDir
+        artworkBeingRead.formUnion(ids)
+        for id in ids { cardArtwork[id] = nil }
+        Task.detached {
+            for id in ids {
+                _ = AppViewModel.runBackend(
+                    ["aircard_backend.py", "--artwork", udid, id, "--forget"], scriptDir: scriptDir)
+                let data = AppViewModel.runBackend(
+                    ["aircard_backend.py", "--artwork", udid, id], scriptDir: scriptDir)
+                let path = AppViewModel.artworkPath(from: data)
+                await MainActor.run {
+                    self.artworkBeingRead.remove(id)
+                    if let path = path, let image = NSImage(contentsOfFile: path) {
+                        self.cardArtwork[id] = image
+                    }
+                }
+            }
+        }
+    }
+
+    /// The file the backend says holds this card's artwork, if there is one.
+    ///
+    /// Returns a path rather than an image: NSImage is not Sendable, so it has to
+    /// be loaded on the main actor instead of in the worker that ran the tool.
+    nonisolated private static func artworkPath(from data: Data?) -> String? {
+        guard let data = data, let text = String(data: data, encoding: .utf8) else { return nil }
+        for line in text.split(separator: "\n") {
+            guard let lineData = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  (json["ok"] as? Bool) == true,
+                  let path = json["path"] as? String else { continue }
+            return path
+        }
+        return nil
+    }
+
+    nonisolated private static func artworkFailureMessage(from data: Data) -> String? {
+        guard let text = String(data: data, encoding: .utf8) else { return nil }
+        for line in text.split(separator: "\n") {
+            guard let lineData = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  (json["ok"] as? Bool) == false else { continue }
+            return json["message"] as? String
+        }
+        return nil
     }
 
     // Reading artwork back off the phone moves it and writes it out again, so
@@ -1062,6 +1178,8 @@ class AppViewModel: ObservableObject {
                     // The phone holds the original artwork again, so no skin
                     // signature describes this card any more.
                     self.forgetFlashedSkin(udid: udid, cardId: id)
+                    // The phone holds the saved original again.
+                    self.refreshArtwork(for: [id])
                 } else {
                     self.statusText = L("status.restore_failed", "Could not restore the card")
                 }
@@ -1449,6 +1567,9 @@ class AppViewModel: ObservableObject {
                     self.statusText = L("status.complete_all_cards_updated", "Complete! All cards updated.")
                     self.showSuccessAlert = true
                     self.log("Skins successfully applied to all selected cards!")
+                    // Cards that were written to now show the skin on the phone,
+                    // so anything remembered about their artwork is out of date.
+                    self.refreshArtwork(for: selectedCardsWithSkin.map(\.id))
                 }
             }
         }
@@ -1780,6 +1901,13 @@ struct WalletCardView: View {
     var isFlashed: Bool = false
     let hasBackup: Bool
     let busy: Bool
+
+    /// The card's artwork as it is on the phone, so this row can be told apart
+    /// from the others. nil until something is known about this card.
+    let artwork: NSImage?
+    /// True while that artwork is being read off the phone.
+    let isReadingArtwork: Bool
+    let onReadArtwork: () -> Void
     let onPickImage: () -> Void
     let onClearImage: () -> Void
     let onBackup: () -> Void
@@ -1823,6 +1951,42 @@ struct WalletCardView: View {
                         .help(L("ui.remove_skin", "Remove skin"))
                         
                         // Hover overlay: Change Skin
+                        if isHovered {
+                            VStack {
+                                Spacer()
+                                HStack {
+                                    Spacer()
+                                    Label(L("ui.change_skin", "Change Skin"), systemImage: "photo.badge.arrow.forward")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(.ultraThinMaterial)
+                                        .cornerRadius(20)
+                                        .shadow(radius: 4)
+                                    Spacer()
+                                }
+                                .padding(.bottom, 12)
+                            }
+                        }
+                    }
+                } else if let img = artwork {
+                    // The card's own artwork. Not a skin: nothing here is waiting
+                    // to be flashed, so no status badge either.
+                    ZStack(alignment: .topTrailing) {
+                        Image(nsImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 290, height: 182)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        
+                        LinearGradient(
+                            colors: [.white.opacity(0.18), .clear, .black.opacity(0.12)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        
                         if isHovered {
                             VStack {
                                 Spacer()
@@ -2010,6 +2174,15 @@ struct WalletCardView: View {
                         Divider()
                         Text(L("ui.original_saved", "Original artwork is saved"))
                     }
+
+                    Divider()
+                    Button(action: onReadArtwork) {
+                        Label(isReadingArtwork
+                              ? L("status.reading_artwork", "Reading the card's artwork...")
+                              : L("ui.read_artwork_from_iphone", "Read Artwork from iPhone"),
+                              systemImage: "iphone.and.arrow.forward")
+                    }
+                    .disabled(busy || isReadingArtwork)
                 } label: {
                     Image(systemName: hasBackup ? "clock.arrow.circlepath" : "ellipsis.circle")
                         .font(.system(size: 11))
@@ -2021,6 +2194,25 @@ struct WalletCardView: View {
                 .help(hasBackup
                       ? L("ui.original_saved", "Original artwork is saved")
                       : L("ui.save_original_help", "Save this card's original artwork so it can be put back"))
+
+                // Read this card's artwork off the phone, so the row can be told
+                // apart from the rest. Only needed for a card with nothing saved
+                // yet: the read moves the file off the card and writes it back, so
+                // it takes about a minute and only runs when asked.
+                Button(action: onReadArtwork) {
+                    if isReadingArtwork {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "iphone.and.arrow.forward")
+                            .font(.system(size: 13))
+                            .foregroundColor(artwork == nil ? .accentColor : .secondary.opacity(0.7))
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(busy || isReadingArtwork)
+                .help(L("ui.read_artwork_help", "Show this card's artwork in the list. Reading it moves the file off the iPhone and writes it back, so it takes a minute."))
+                .accessibilityLabel(L("ui.read_artwork_from_iphone", "Read Artwork from iPhone"))
 
                 // Delete button
                 Button(action: onDelete) {
@@ -2110,6 +2302,9 @@ struct ContentView: View {
                                     isFlashed: vm.isSkinFlashed(vm.cards[idx]),
                                     hasBackup: vm.backedUpCards.contains(vm.cards[idx].id),
                                     busy: vm.isFlashing,
+                                    artwork: vm.cardArtwork[vm.cards[idx].id],
+                                    isReadingArtwork: vm.artworkBeingRead.contains(vm.cards[idx].id),
+                                    onReadArtwork: { vm.readArtworkFromPhone(cardId: vm.cards[idx].id) },
                                     onPickImage: { openCardImagePicker(for: vm.cards[idx].id) },
                                     onClearImage: { vm.clearCardImage(for: vm.cards[idx].id) },
                                     onBackup: { vm.backupCard(id: vm.cards[idx].id) },

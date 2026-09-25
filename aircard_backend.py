@@ -58,6 +58,10 @@ from aircard import (
     has_card_backup,
     list_backed_up_cards,
     BACKED_UP_ASSETS,
+    card_artwork_cache_dir,
+    card_artwork_file,
+    card_backup_dir,
+    forget_card_artwork,
     list_connected_devices,
     load_saved_cards,
     read_card_backup,
@@ -250,6 +254,86 @@ def cmd_restore(udid: str, card_hash: str) -> bool:
 def cmd_backups(udid: str):
     """Which cards on this device still have their original artwork saved."""
     print(json.dumps({"ok": True, "cards": list_backed_up_cards(udid)}))
+
+
+def cmd_artwork(udid: str, card_hash: str, fetch: bool = False, forget: bool = False) -> bool:
+    """Answers where the app can find a picture of this card.
+
+    Resolved on this Mac wherever possible -- the saved original first, then a
+    copy an earlier read left behind -- because that costs the phone nothing.
+    Reading the artwork is opt-in: it moves the file off the card and writes it
+    back, which is not something to do to someone's card behind their back.
+
+    Unlike a backup this may be partial. One drawable file is enough to tell two
+    rows apart, so a card whose PDF cannot be read still gets a thumbnail.
+    """
+    if forget:
+        forget_card_artwork(udid, card_hash)
+
+    saved = card_artwork_file(card_backup_dir(udid, card_hash))
+    if saved:
+        print(json.dumps({"ok": True, "path": str(saved), "source": "backup"}))
+        return True
+
+    cached = card_artwork_cache_dir(udid, card_hash)
+    held = card_artwork_file(cached)
+    if held and not fetch:
+        print(json.dumps({"ok": True, "path": str(held), "source": "cache"}))
+        return True
+
+    if not fetch:
+        print(json.dumps({
+            "ok": False, "card": card_hash, "code": "artwork.not_saved",
+            "message": "This card's artwork has not been read yet."
+        }))
+        return False
+
+    pkpass_dir = f"/var/mobile/Library/Passes/Cards/{card_hash}.pkpass"
+    unread = []
+    try:
+        cached.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        print(json.dumps({
+            "ok": False, "card": card_hash, "code": "artwork.read_failed",
+            "message": f"Could not store the artwork for {card_hash[:12]}... ({error})"
+        }))
+        return False
+
+    for asset in BACKED_UP_ASSETS:
+        try:
+            payload = read_file(udid, pkpass_dir, asset)
+        except Exception:
+            payload = None
+        if not payload:
+            unread.append(asset)
+            continue
+        try:
+            (cached / asset).write_bytes(payload)
+        except OSError:
+            unread.append(asset)
+
+    fetched = card_artwork_file(cached)
+    if not fetched:
+        # Nothing readable at all: do not leave an empty directory behind, or the
+        # next look-up would think there is something to show.
+        forget_card_artwork(udid, card_hash)
+        print(json.dumps({
+            "ok": False, "card": card_hash, "code": "artwork.read_failed",
+            "message": (f"Could not read the artwork for {card_hash[:12]}... "
+                        f"({', '.join(unread)})")
+        }))
+        return False
+
+    if unread:
+        # Worth saying: the thumbnail is real, but it is not the whole picture.
+        # Printed before the verdict, which stays the last line like every other
+        # command here.
+        print(json.dumps({
+            "type": "progress", "card": card_hash, "code": "artwork.partial",
+            "message": f"Could not read {', '.join(unread)}"
+        }))
+    print(json.dumps({"ok": True, "path": str(fetched), "source": "device"}))
+    return True
 
 
 def cmd_get_saved_cards():
@@ -754,6 +838,11 @@ def main():
         cmd_get_saved_cards()
     elif norm_cmd == "backups" and len(sys.argv) > 2:
         cmd_backups(sys.argv[2])
+    elif norm_cmd == "artwork" and len(sys.argv) > 3:
+        flags = sys.argv[4:]
+        if not cmd_artwork(sys.argv[2], sys.argv[3],
+                           fetch="--fetch" in flags, forget="--forget" in flags):
+            sys.exit(1)
     elif norm_cmd == "backup" and len(sys.argv) > 3:
         if not cmd_backup(sys.argv[2], sys.argv[3]):
             sys.exit(1)

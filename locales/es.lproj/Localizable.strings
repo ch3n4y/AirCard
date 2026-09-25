@@ -6,6 +6,7 @@
 "bold.short_bold" = "Negrita";
 "bold.short_both" = "Normal + negrita";
 "bold.short_regular" = "Normal";
+"error.could_not_read_card_artwork" = "No se pudo leer la imagen de esta tarjeta. Consulta el registro.";
 "error.could_not_read_picked_image" = "AirCard no ha podido leer la imagen que elegiste para una de las tarjetas. Esa tarjeta no se ha modificado.";
 "error.could_not_run_device_tools" = "AirCard no ha podido ejecutar sus herramientas de dispositivo. Es posible que la app esté dañada o mal instalada.";
 "error.failed_to_inspect_passthm_file" = "No se ha podido analizar el archivo .passthm";
@@ -55,6 +56,7 @@
 "status.passcode_theme_applied_successfully" = "¡Tema de código aplicado!";
 "status.poster_image_loaded_ready_to" = "Póster cargado · Listo para encuadrar y recortar";
 "status.preparing_skin" = "[%1$d/%2$d] Preparando el diseño de %3$@…";
+"status.reading_artwork" = "Leyendo la imagen de la tarjeta…";
 "status.ready" = "Listo";
 "status.restore_failed" = "No se ha podido restaurar la tarjeta";
 "status.restored" = "Tarjeta restaurada. Fuerza el cierre de Wallet para verla.";
@@ -156,6 +158,8 @@
 "ui.paste_one_or_more_card" = "Pega uno o más hashes de tarjeta (separados por espacios, comas o saltos de línea):";
 "ui.percent" = "%d %%";
 "ui.poster_artwork" = "Imagen del póster";
+"ui.read_artwork_from_iphone" = "Leer la imagen desde el iPhone";
+"ui.read_artwork_help" = "Muestra la imagen de esta tarjeta en la lista. Al leerla, el archivo se mueve fuera del iPhone y se vuelve a escribir, por lo que tarda un minuto.";
 "ui.reflash_all_count" = "Volver a aplicar todo (%d)";
 "ui.refresh_device_connection" = "Actualizar la conexión del dispositivo";
 "ui.remove" = "Quitar";

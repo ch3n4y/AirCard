@@ -6,6 +6,7 @@
 "bold.short_bold" = "Жирний";
 "bold.short_both" = "Звичайний + жирний";
 "bold.short_regular" = "Звичайний";
+"error.could_not_read_card_artwork" = "Не вдалося прочитати зображення цієї картки. Дивіться журнал.";
 "error.could_not_read_picked_image" = "AirCard не вдалося прочитати вибране зображення для однієї з карток. Цю картку не змінено.";
 "error.could_not_run_device_tools" = "AirCard не вдалося запустити інструменти для роботи з пристроєм. Можливо, програму пошкоджено або встановлено не повністю.";
 "error.failed_to_inspect_passthm_file" = "Не вдалося прочитати файл .passthm";
@@ -55,6 +56,7 @@
 "status.passcode_theme_applied_successfully" = "Тему код-пароля застосовано!";
 "status.poster_image_loaded_ready_to" = "Постер завантажено · можна кадрувати й нарізати";
 "status.preparing_skin" = "[%1$d/%2$d] Підготовка оформлення для %3$@…";
+"status.reading_artwork" = "Читання зображення картки…";
 "status.ready" = "Готово";
 "status.restore_failed" = "Не вдалося відновити картку";
 "status.restored" = "Картку відновлено. Примусово закрийте Wallet, щоб побачити зміни.";
@@ -156,6 +158,8 @@
 "ui.paste_one_or_more_card" = "Вставте один або кілька хешів карток (через пробіл, кому або з нового рядка):";
 "ui.percent" = "%d%%";
 "ui.poster_artwork" = "Постер";
+"ui.read_artwork_from_iphone" = "Прочитати зображення з iPhone";
+"ui.read_artwork_help" = "Показує зображення цієї картки у списку. Під час читання файл переноситься з iPhone і записується назад, це триває близько хвилини.";
 "ui.reflash_all_count" = "Записати все заново (%d)";
 "ui.refresh_device_connection" = "Оновити підключення пристрою";
 "ui.remove" = "Вилучити";

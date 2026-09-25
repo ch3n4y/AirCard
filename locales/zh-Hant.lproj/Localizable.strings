@@ -6,6 +6,7 @@
 "bold.short_bold" = "粗體";
 "bold.short_both" = "一般＋粗體";
 "bold.short_regular" = "一般";
+"error.could_not_read_card_artwork" = "無法讀取這張卡的卡面。請查看日誌。";
 "error.could_not_read_picked_image" = "AirCard 無法讀取你為某張卡片選擇的圖片。該卡片未做修改。";
 "error.could_not_run_device_tools" = "AirCard 無法執行其裝置工具。應用程式可能已損毀或安裝不完整。";
 "error.failed_to_inspect_passthm_file" = "無法讀取 .passthm 檔案";
@@ -55,6 +56,7 @@
 "status.passcode_theme_applied_successfully" = "密碼主題已成功套用！";
 "status.poster_image_loaded_ready_to" = "海報圖片已載入 · 可以開始構圖切割";
 "status.preparing_skin" = "[%1$d/%2$d] 正在準備 %3$@ 的外觀…";
+"status.reading_artwork" = "正在讀取卡面…";
 "status.ready" = "就緒";
 "status.restore_failed" = "卡片還原失敗。";
 "status.restored" = "卡片已還原。強制結束「錢包」App 即可看到。";
@@ -156,6 +158,8 @@
 "ui.paste_one_or_more_card" = "貼上一組或多組卡片雜湊值（以空格、逗號或換行分隔）：";
 "ui.percent" = "%d%%";
 "ui.poster_artwork" = "海報圖稿";
+"ui.read_artwork_from_iphone" = "從 iPhone 讀取卡面";
+"ui.read_artwork_help" = "在列表中顯示這張卡的卡面。讀取時會把檔案從 iPhone 移出再寫回，因此大約需要一分鐘。";
 "ui.reflash_all_count" = "全部重新寫入（%d 張）";
 "ui.refresh_device_connection" = "重新整理裝置連線";
 "ui.remove" = "移除";
