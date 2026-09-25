@@ -106,6 +106,41 @@ impl App {
     }
 }
 
+impl App {
+    /// The shared handles, so device work can move to a thread of its own.
+    fn shared(&self) -> Self {
+        Self {
+            phone: Arc::clone(&self.phone),
+            stop: Arc::clone(&self.stop),
+            scan: Arc::clone(&self.scan),
+        }
+    }
+}
+
+/// Runs device work on a thread of its own.
+///
+/// Not a detail. The framework delivers device notifications to the run loop of
+/// the thread that subscribed, and a synchronous Tauri command runs on the main
+/// thread -- whose run loop belongs to AppKit and is already being run by it. Ask
+/// from there and the run loop comes back at once without waiting for anything:
+/// an empty device list, and "no iPhone is reachable" for a phone sitting on the
+/// cable. The same call from a thread of its own works, which is why the scan --
+/// the only device operation that spawns a thread -- was the only one that ever
+/// succeeded.
+fn off_the_main_thread<T, F>(work: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    match std::thread::spawn(work).join() {
+        Ok(result) => result,
+        Err(_) => {
+            log_line("a device operation panicked on its own thread");
+            Err("操作未能完成。请查看日志。".to_owned())
+        }
+    }
+}
+
 /// Holds the phone for as long as it lives.
 #[derive(Debug)]
 struct Turn(Arc<AtomicBool>);
@@ -208,11 +243,17 @@ fn app_paths() -> AppPaths {
 /// iPhones this Mac can reach right now.
 #[tauri::command]
 fn list_devices() -> Result<Vec<aircard_device::DeviceInfo>, String> {
-    aircard_device::list_devices().map_err(|error| {
-        failed(
-            "无法读取设备列表。请确认 iPhone 已连接，并已在手机上信任此电脑。",
-            error,
-        )
+    off_the_main_thread(|| {
+        let devices = aircard_device::list_devices().map_err(|error| {
+            failed(
+                "无法读取设备列表。请确认 iPhone 已连接，并已在手机上信任此电脑。",
+                error,
+            )
+        })?;
+        // How many phones were seen is the first thing anybody asks, and the
+        // answer is not otherwise written down anywhere.
+        log_line(&format!("listed {} device(s)", devices.len()));
+        Ok(devices)
     })
 }
 
@@ -314,7 +355,12 @@ fn read_asset(device: &Device, hash: &str, name: &str) -> Result<Vec<u8>, String
 /// Reads a card's face off the phone and keeps it, so the list can show it.
 #[tauri::command]
 fn read_artwork(app: State<App>, udid: String, hash: String) -> Result<(), String> {
-    let _turn = Turn::take(&app)?;
+    let app = app.shared();
+    off_the_main_thread(move || read_artwork_now(&app, udid, hash))
+}
+
+fn read_artwork_now(app: &App, udid: String, hash: String) -> Result<(), String> {
+    let _turn = Turn::take(app)?;
     let device = Device::new(&udid);
     let png = read_asset(&device, &hash, BACKED_UP_ASSETS[0])?;
     artwork_cache()
@@ -327,8 +373,11 @@ fn read_artwork(app: State<App>, udid: String, hash: String) -> Result<(), Strin
 /// Saves the original artwork of a card, once.
 #[tauri::command]
 fn save_original(app: State<App>, udid: String, hash: String) -> Result<(), String> {
-    let _turn = Turn::take(&app)?;
-    save_original_locked(&udid, &hash)
+    let app = app.shared();
+    off_the_main_thread(move || {
+        let _turn = Turn::take(&app)?;
+        save_original_locked(&udid, &hash)
+    })
 }
 
 fn save_original_locked(udid: &str, hash: &str) -> Result<(), String> {
@@ -351,7 +400,12 @@ fn save_original_locked(udid: &str, hash: &str) -> Result<(), String> {
 /// Puts a card's saved original back on the phone.
 #[tauri::command]
 fn restore_original(app: State<App>, udid: String, hash: String) -> Result<(), String> {
-    let _turn = Turn::take(&app)?;
+    let app = app.shared();
+    off_the_main_thread(move || restore_original_now(&app, udid, hash))
+}
+
+fn restore_original_now(app: &App, udid: String, hash: String) -> Result<(), String> {
+    let _turn = Turn::take(app)?;
     let store = backup_store();
     let assets = store.read(&udid, &hash);
     if assets.is_empty() {
@@ -539,11 +593,23 @@ fn flash_cards(
     if image.is_empty() {
         return Err("请先选择要刷入的图片。".to_owned());
     }
+    // Fitting the picture is local work; everything that touches the phone
+    // happens on a thread of its own.
     let png = fit_to_face(&image)?;
     let assets =
         artwork::build_assets(&png).map_err(|error| failed("无法准备卡面素材。", error))?;
 
-    let _turn = Turn::take(&app)?;
+    let app = app.shared();
+    off_the_main_thread(move || flash_now(&app, udid, hashes, assets))
+}
+
+fn flash_now(
+    app: &App,
+    udid: String,
+    hashes: Vec<String>,
+    assets: Vec<(String, Vec<u8>)>,
+) -> Result<Vec<FlashResult>, String> {
+    let _turn = Turn::take(app)?;
     let device = Device::new(&udid);
     let airlift = device.airlift();
     let backups = backup_store();
@@ -605,7 +671,12 @@ fn flash_cards(
 
 #[tauri::command]
 fn leftovers(app: State<App>, udid: String) -> Result<Vec<LeftoverView>, String> {
-    let _turn = Turn::take(&app)?;
+    let app = app.shared();
+    off_the_main_thread(move || leftovers_now(&app, udid))
+}
+
+fn leftovers_now(app: &App, udid: String) -> Result<Vec<LeftoverView>, String> {
+    let _turn = Turn::take(app)?;
     let device = Device::new(&udid);
     let found = device
         .airlift()
@@ -622,7 +693,12 @@ fn leftovers(app: State<App>, udid: String) -> Result<Vec<LeftoverView>, String>
 
 #[tauri::command]
 fn sweep_leftovers(app: State<App>, udid: String, names: Vec<String>) -> Result<(), String> {
-    let _turn = Turn::take(&app)?;
+    let app = app.shared();
+    off_the_main_thread(move || sweep_leftovers_now(&app, udid, names))
+}
+
+fn sweep_leftovers_now(app: &App, udid: String, names: Vec<String>) -> Result<(), String> {
+    let _turn = Turn::take(app)?;
     let device = Device::new(&udid);
     let airlift = device.airlift();
     let mut failures = Vec::new();
