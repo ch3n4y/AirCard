@@ -31,6 +31,9 @@ type Props = {
   udid: string | null;
   cards: Card[];
   scan: ScanStatus | null;
+  /** 扫描结束后自动读取卡面的进度，没有在读时为 null */
+  faces: { done: number; total: number } | null;
+  onStopFaces: () => void;
   selected: string[];
   busy: string | null;
   run: Run;
@@ -51,6 +54,8 @@ export function CardsPanel({
   udid,
   cards,
   scan,
+  faces,
+  onStopFaces,
   selected,
   busy,
   run,
@@ -235,6 +240,20 @@ export function CardsPanel({
       )}
 
       {scan?.problem && <Alert type="warning" showIcon message={scan.problem} />}
+
+      {faces && (
+        <Alert
+          type="info"
+          showIcon
+          icon={<Spin size="small" />}
+          message={t.faceProgress(faces.done, faces.total)}
+          action={
+            <Button size="small" danger onClick={onStopFaces}>
+              {t.stopReadingFaces}
+            </Button>
+          }
+        />
+      )}
 
       {cards.length === 0 ? (
         <Empty description={t.noCards}>

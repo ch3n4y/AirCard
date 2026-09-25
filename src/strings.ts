@@ -37,6 +37,10 @@ export const t = {
   scanProgress: (lines: number, found: number) =>
     `已读取 ${lines} 行日志 · 发现 ${found} 张卡片`,
   scanHint: "现在请在 iPhone 上打开「钱包」，逐张滑过卡片。",
+  readingFaces: "正在读取卡面",
+  stopReadingFaces: "停止读取",
+  faceProgress: (done: number, total: number) => `正在读取卡面 ${done}/${total}…`,
+  facesFailed: (count: number) => `${count} 张卡面未能读取。请查看日志。`,
   scanRecord: "扫描记录",
   clearScanRecord: "清除扫描记录",
   removeUnseenCards: "移除上次扫描未发现的卡片",

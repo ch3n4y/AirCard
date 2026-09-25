@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { App as AntApp, ConfigProvider, Flex, Tabs, Tag, Typography } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -41,6 +41,8 @@ export function AirCard() {
   const [results, setResults] = useState<FlashResult[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [dropping, setDropping] = useState(false);
+  const [faces, setFaces] = useState<{ done: number; total: number } | null>(null);
+  const facesStop = useRef(false);
 
   const run: Run = useCallback(
     async (label, work) => {
@@ -80,6 +82,35 @@ export function AirCard() {
     setCards(await api.cards(udid));
   }, [udid]);
 
+  /**
+   * 把列表里还没有卡面的卡片一张张读回来。
+   *
+   * 扫描只能知道卡片存在；卡面要一张张从手机上读，而读一张大约一分钟。所以这件事
+   * 自己开始、自带进度、也随时能停：一次失败不该挡住其余卡片。
+   */
+  const loadFaces = useCallback(
+    async (list: Card[], device: string) => {
+      const wanted = list.filter((card) => !card.has_artwork).map((card) => card.hash);
+      if (wanted.length === 0) return;
+      facesStop.current = false;
+      setFaces({ done: 0, total: wanted.length });
+      let failed = 0;
+      for (const [index, hash] of wanted.entries()) {
+        if (facesStop.current) break;
+        try {
+          await api.readArtwork(device, hash);
+        } catch {
+          failed += 1;
+        }
+        setFaces({ done: index + 1, total: wanted.length });
+        await refreshCards().catch(() => undefined);
+      }
+      setFaces(null);
+      if (failed > 0) message.warning(t.facesFailed(failed));
+    },
+    [refreshCards, message],
+  );
+
   useEffect(() => {
     void refreshDevices();
     void api
@@ -116,9 +147,13 @@ export function AirCard() {
     if (scan?.running !== false || !udid || (scan.found.length ?? 0) === 0) return;
     void api
       .foldScan(udid)
-      .then(() => refreshCards())
+      .then((list) => {
+        setCards(list);
+        // 扫描到之后就把卡面读回来，不用等人一张张点。
+        return loadFaces(list, udid);
+      })
       .catch(() => undefined);
-  }, [scan?.running, scan?.found.length, udid, refreshCards]);
+  }, [scan?.running, scan?.found.length, udid, loadFaces]);
 
   const loadImage = useCallback(
     async (path: string) => {
@@ -187,17 +222,24 @@ export function AirCard() {
   const onCardsChanged = () =>
     void refreshCards().catch(() => undefined);
 
+  // 自动读取卡面期间，设备按钮同样要失效——同一台手机上不能有两个会话。
+  const busyLabel = busy ?? (faces ? t.readingFaces : null);
+
   const cardTab = (
     <CardsPanel
       udid={udid}
       cards={cards}
       scan={scan}
       selected={selected}
-      busy={busy}
+      busy={busyLabel}
       run={run}
       onSelectionChange={setSelected}
       onCardsChanged={onCardsChanged}
       onRefreshScanRecord={onCardsChanged}
+      faces={faces}
+      onStopFaces={() => {
+        facesStop.current = true;
+      }}
       onStartScan={startScan}
       onStopScan={() => void api.stopScan()}
     />
@@ -229,7 +271,7 @@ export function AirCard() {
         devices={devices}
         selected={udid}
         problem={deviceProblem}
-        busy={busy}
+        busy={busyLabel}
         onSelect={setUdid}
         onRefresh={() => void run(t.refreshDevices, refreshDevices)}
       />
@@ -248,7 +290,7 @@ export function AirCard() {
                   selected={selected}
                   image={image}
                   results={results}
-                  busy={busy}
+                  busy={busyLabel}
                   onPick={() => void pickImage()}
                   onFlash={flash}
                 />
@@ -261,7 +303,7 @@ export function AirCard() {
                 <MaintenancePanel
                   udid={udid}
                   paths={paths}
-                  busy={busy}
+                  busy={busyLabel}
                   run={run}
                 />
               ),
@@ -270,8 +312,8 @@ export function AirCard() {
         />
       </div>
 
-      <Typography.Text type={busy ? "warning" : "secondary"}>
-        {busy ? `${busy}…` : t.ready}
+      <Typography.Text type={busyLabel ? "warning" : "secondary"}>
+        {busyLabel ? `${busyLabel}…` : t.ready}
       </Typography.Text>
     </Flex>
   );
