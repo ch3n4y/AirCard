@@ -79,6 +79,23 @@ pub fn log_file() -> PathBuf {
     }
 }
 
+/// The list of cards the window knows about.
+///
+/// A plain JSON array of card numbers, which is the file the previous
+/// implementation kept, so a list built up over months is read as it stands.
+pub fn cards_file() -> PathBuf {
+    home().join(".aircard_cards.json")
+}
+
+/// Which cards the most recent scan of each phone saw.
+///
+/// Kept apart from the card list: the list is what a person chose to keep, and
+/// this is only what a scan happened to see, which changes on every scan and is
+/// wrong the moment a card is moved on the phone.
+pub fn scan_record_file() -> PathBuf {
+    home().join(".aircard_scan_seen.json")
+}
+
 /// Is there anything at `path` worth reading?
 pub fn file_non_empty(path: &Path) -> bool {
     std::fs::metadata(path)
