@@ -19,7 +19,7 @@
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
     use std::ffi::{c_char, c_int, c_void, CStr, CString};
     use std::sync::OnceLock;
 
@@ -48,7 +48,7 @@ mod macos {
         message: u32,
     }
 
-    #[derive(Debug, Error)]
+    #[derive(Debug, Clone, Error)]
     pub enum DeviceError {
         #[error("could not load {FRAMEWORK}: {detail}")]
         Framework { detail: String },
@@ -56,6 +56,26 @@ mod macos {
         MissingSymbol { name: String },
         #[error("device discovery could not start (status {status})")]
         Subscribe { status: c_int },
+        #[error("no iPhone with udid {udid} is reachable")]
+        NotFound { udid: String },
+        #[error("the iPhone could not be opened (status {status})")]
+        Connect { status: c_int },
+        #[error("pairing with the iPhone was refused (status {status})")]
+        Pairing { status: c_int },
+        #[error("the device session could not start (status {status})")]
+        Session { status: c_int },
+        #[error("the afc service could not start (status {status})")]
+        Service { status: c_int },
+        #[error("afc refused the operation (status {status})")]
+        Afc { status: c_int },
+        #[error("{path} is not a path this code will send to the device")]
+        Path { path: String },
+        #[error("{path} is not there")]
+        AfcPath { path: String },
+        #[error("{path} is {size} bytes, over the {limit} byte limit")]
+        TooLarge { path: String, size: u64, limit: u64 },
+        #[error("{path} is still there after removing it")]
+        StillThere { path: String },
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -111,6 +131,34 @@ mod macos {
         validate_pairing: unsafe extern "C" fn(*const c_void) -> c_int,
         start_session: unsafe extern "C" fn(*const c_void) -> c_int,
         stop_session: unsafe extern "C" fn(*const c_void) -> c_int,
+        // Sessions and AFC. The socket comes from the service connection, and the
+        // secure IO context has to be handed to AFC, or it quietly transfers nothing.
+        secure_start_service:
+            unsafe extern "C" fn(*const c_void, CfString, *const c_void, *mut CfType) -> c_int,
+        service_socket: unsafe extern "C" fn(CfType) -> c_int,
+        service_secure_context: unsafe extern "C" fn(CfType) -> *mut c_void,
+        service_invalidate: unsafe extern "C" fn(CfType) -> c_int,
+        cf_retain: unsafe extern "C" fn(CfType) -> CfType,
+        cf_run_loop_stop: unsafe extern "C" fn(CfType),
+        cf_run_loop_current: unsafe extern "C" fn() -> CfType,
+        afc_open: unsafe extern "C" fn(c_int, u32, *mut CfType) -> c_int,
+        afc_close: unsafe extern "C" fn(CfType) -> c_int,
+        afc_set_secure_context: unsafe extern "C" fn(CfType, *mut c_void) -> c_int,
+        afc_set_dispose_secure_context: unsafe extern "C" fn(CfType, c_int) -> c_int,
+        afc_set_io_timeout: unsafe extern "C" fn(CfType, u32) -> c_int,
+        afc_file_info_open: unsafe extern "C" fn(CfType, *const c_char, *mut CfType) -> c_int,
+        afc_key_value_read:
+            unsafe extern "C" fn(CfType, *mut *mut c_char, *mut *mut c_char) -> c_int,
+        afc_key_value_close: unsafe extern "C" fn(CfType) -> c_int,
+        afc_file_ref_open: unsafe extern "C" fn(CfType, *const c_char, u64, *mut CfType) -> c_int,
+        afc_file_ref_read: unsafe extern "C" fn(CfType, CfType, *mut c_void, *mut i64) -> c_int,
+        afc_file_ref_write: unsafe extern "C" fn(CfType, CfType, *const c_void, i64) -> c_int,
+        afc_file_ref_close: unsafe extern "C" fn(CfType, CfType) -> c_int,
+        afc_directory_create: unsafe extern "C" fn(CfType, *const c_char) -> c_int,
+        afc_remove_path: unsafe extern "C" fn(CfType, *const c_char) -> c_int,
+        afc_directory_open: unsafe extern "C" fn(CfType, *const c_char, *mut CfType) -> c_int,
+        afc_directory_read: unsafe extern "C" fn(CfType, CfType, *mut *mut c_char) -> c_int,
+        afc_directory_close: unsafe extern "C" fn(CfType, CfType) -> c_int,
     }
 
     // Written once and never mutated; the CF singletons are process-wide constants,
@@ -189,18 +237,34 @@ mod macos {
                     validate_pairing: function(handle, "AMDeviceValidatePairing")?,
                     start_session: function(handle, "AMDeviceStartSession")?,
                     stop_session: function(handle, "AMDeviceStopSession")?,
+                    secure_start_service: function(handle, "AMDeviceSecureStartService")?,
+                    service_socket: function(handle, "AMDServiceConnectionGetSocket")?,
+                    service_secure_context: function(handle, "AMDServiceConnectionGetSecureIOContext")?,
+                    service_invalidate: function(handle, "AMDServiceConnectionInvalidate")?,
+                    cf_retain: function(handle, "CFRetain")?,
+                    cf_run_loop_stop: function(handle, "CFRunLoopStop")?,
+                    cf_run_loop_current: function(handle, "CFRunLoopGetCurrent")?,
+                    afc_open: function(handle, "AFCConnectionOpen")?,
+                    afc_close: function(handle, "AFCConnectionClose")?,
+                    afc_set_secure_context: function(handle, "AFCConnectionSetSecureContext")?,
+                    afc_set_dispose_secure_context: function(handle, "AFCConnectionSetDisposeSecureContextOnInvalidate")?,
+                    afc_set_io_timeout: function(handle, "AFCConnectionSetIOTimeout")?,
+                    afc_file_info_open: function(handle, "AFCFileInfoOpen")?,
+                    afc_key_value_read: function(handle, "AFCKeyValueRead")?,
+                    afc_key_value_close: function(handle, "AFCKeyValueClose")?,
+                    afc_file_ref_open: function(handle, "AFCFileRefOpen")?,
+                    afc_file_ref_read: function(handle, "AFCFileRefRead")?,
+                    afc_file_ref_write: function(handle, "AFCFileRefWrite")?,
+                    afc_file_ref_close: function(handle, "AFCFileRefClose")?,
+                    afc_directory_create: function(handle, "AFCDirectoryCreate")?,
+                    afc_remove_path: function(handle, "AFCRemovePath")?,
+                    afc_directory_open: function(handle, "AFCDirectoryOpen")?,
+                    afc_directory_read: function(handle, "AFCDirectoryRead")?,
+                    afc_directory_close: function(handle, "AFCDirectoryClose")?,
                 })
             })
             .as_ref()
-            .map_err(|error| match error {
-                DeviceError::Framework { detail } => DeviceError::Framework {
-                    detail: detail.clone(),
-                },
-                DeviceError::MissingSymbol { name } => {
-                    DeviceError::MissingSymbol { name: name.clone() }
-                }
-                DeviceError::Subscribe { status } => DeviceError::Subscribe { status: *status },
-            })
+            .map_err(Clone::clone)
     }
 
     fn cf_string(symbols: &Symbols, text: &str) -> Option<(CfString, CString)> {
@@ -462,6 +526,465 @@ mod macos {
         Ok(FOUND.with(|found| found.borrow().clone()))
     }
 
+    /// A device the framework handed us, retained so it stays alive while we use it.
+    struct DeviceHandle(*const c_void);
+
+    impl Drop for DeviceHandle {
+        fn drop(&mut self) {
+            if let Ok(symbols) = symbols() {
+                unsafe { (symbols.cf_release)(self.0) };
+            }
+        }
+    }
+
+    thread_local! {
+        /// The udid `find_device` is waiting for, and what it found.
+        static WANTED: RefCell<Option<String>> = const { RefCell::new(None) };
+        static TARGET: Cell<*const c_void> = const { Cell::new(std::ptr::null()) };
+    }
+
+    extern "C" fn on_target(info: *mut CallbackInfo, _context: *mut c_void) {
+        // Same rules as the discovery callback: framework owned, so no panics.
+        let Ok(symbols) = symbols() else { return };
+        if info.is_null() || !TARGET.with(|slot| slot.get().is_null()) {
+            return;
+        }
+        let (device, message) = unsafe { ((*info).device, (*info).message) };
+        if device.is_null() || message != ATTACHED {
+            return;
+        }
+        let identifier = unsafe { (symbols.device_identifier)(device) };
+        if identifier.is_null() {
+            return;
+        }
+        let udid = read_cf_string(symbols, identifier);
+        unsafe { (symbols.cf_release)(identifier) };
+
+        let wanted = WANTED.with(|wanted| wanted.borrow().clone());
+        if wanted.as_deref() != Some(udid.as_str()) {
+            return;
+        }
+        TARGET.with(|slot| slot.set(unsafe { (symbols.cf_retain)(device) }));
+        // Stop waiting the moment the phone that was asked for shows up.
+        unsafe { (symbols.cf_run_loop_stop)((symbols.cf_run_loop_current)()) };
+    }
+
+    /// Finds one iPhone by udid and retains it, waiting up to `seconds` for it.
+    fn find_device(udid: &str, seconds: f64) -> Result<DeviceHandle, DeviceError> {
+        let symbols = symbols()?;
+        let Some(dictionary) = options(symbols) else {
+            return Err(DeviceError::Framework {
+                detail: "could not build the notification options".to_owned(),
+            });
+        };
+
+        WANTED.with(|wanted| *wanted.borrow_mut() = Some(udid.to_owned()));
+        TARGET.with(|slot| slot.set(std::ptr::null()));
+
+        let mut subscription: CfType = std::ptr::null();
+        let status = unsafe {
+            (symbols.subscribe)(
+                on_target,
+                0,
+                0,
+                std::ptr::null_mut(),
+                &mut subscription,
+                dictionary,
+            )
+        };
+        if status == 0 {
+            unsafe { (symbols.cf_run_loop_run)(symbols.k_run_loop_default_mode, seconds, 0) };
+        }
+        if !subscription.is_null() {
+            unsafe { (symbols.unsubscribe)(subscription) };
+        }
+        unsafe { (symbols.cf_release)(dictionary) };
+        WANTED.with(|wanted| *wanted.borrow_mut() = None);
+
+        if status != 0 {
+            return Err(DeviceError::Subscribe { status });
+        }
+        let target = TARGET.with(|slot| slot.get());
+        if target.is_null() {
+            return Err(DeviceError::NotFound {
+                udid: udid.to_owned(),
+            });
+        }
+        Ok(DeviceHandle(target))
+    }
+
+    /// A live AFC connection to one iPhone.
+    ///
+    /// This reaches `/var/mobile/Media` and nothing else. A card's files live in
+    /// `/var/mobile/Library/Passes`, which is why the AirTraffic escape exists:
+    /// AFC will not list that directory, refuses `..`, and does not support
+    /// `MAKE_LINK` at all, so it cannot even plant a symlink to get there.
+    ///
+    /// One session at a time. Two sessions to the same device at once abort the
+    /// process -- a crash, not an error: the framework is not built for it.
+    /// Callers serialise: the window keeps one operation in flight, and the device
+    /// tests run with `--test-threads=1`.
+    pub struct AfcSession {
+        device: DeviceHandle,
+        service: CfType,
+        connection: CfType,
+    }
+
+    impl AfcSession {
+        /// Opens `com.apple.afc` on one iPhone.
+        pub fn open(udid: &str) -> Result<Self, DeviceError> {
+            let symbols = symbols()?;
+            let device = find_device(udid, 30.0)?;
+
+            let status = unsafe { (symbols.connect)(device.0) };
+            if status != 0 {
+                return Err(DeviceError::Connect { status });
+            }
+            if unsafe { (symbols.is_paired)(device.0) } == 0 {
+                unsafe { (symbols.pair)(device.0) };
+            }
+            let mut validated = unsafe { (symbols.validate_pairing)(device.0) };
+            if validated != 0 {
+                // Pair again and retry once, the way the previous helper did.
+                unsafe { (symbols.pair)(device.0) };
+                validated = unsafe { (symbols.validate_pairing)(device.0) };
+            }
+            if validated != 0 {
+                unsafe { (symbols.disconnect)(device.0) };
+                return Err(DeviceError::Pairing { status: validated });
+            }
+            let status = unsafe { (symbols.start_session)(device.0) };
+            if status != 0 {
+                unsafe { (symbols.disconnect)(device.0) };
+                return Err(DeviceError::Session { status });
+            }
+
+            let Some((service_name, _name_owned)) = cf_string(symbols, "com.apple.afc") else {
+                unsafe { (symbols.stop_session)(device.0) };
+                unsafe { (symbols.disconnect)(device.0) };
+                return Err(DeviceError::Framework {
+                    detail: "could not name the afc service".to_owned(),
+                });
+            };
+            let mut service: CfType = std::ptr::null();
+            let status = unsafe {
+                (symbols.secure_start_service)(
+                    device.0,
+                    service_name,
+                    std::ptr::null(),
+                    &mut service,
+                )
+            };
+            unsafe { (symbols.cf_release)(service_name) };
+            if status != 0 || service.is_null() {
+                unsafe { (symbols.stop_session)(device.0) };
+                unsafe { (symbols.disconnect)(device.0) };
+                return Err(DeviceError::Service { status });
+            }
+
+            let mut connection: CfType = std::ptr::null();
+            let status = unsafe {
+                (symbols.afc_open)(
+                    (symbols.service_socket)(service),
+                    0,
+                    &mut connection,
+                )
+            };
+            if status != 0 || connection.is_null() {
+                unsafe { (symbols.service_invalidate)(service) };
+                unsafe { (symbols.stop_session)(device.0) };
+                unsafe { (symbols.disconnect)(device.0) };
+                return Err(DeviceError::Afc { status });
+            }
+
+            // Hand AFC the secure IO context, or the connection answers and moves
+            // no bytes. The previous helper carries the same note.
+            let secure = unsafe { (symbols.service_secure_context)(service) };
+            if !secure.is_null() {
+                unsafe {
+                    (symbols.afc_set_secure_context)(connection, secure);
+                    (symbols.afc_set_dispose_secure_context)(connection, 0);
+                    (symbols.afc_set_io_timeout)(connection, 30);
+                }
+            }
+
+            Ok(Self {
+                device,
+                service,
+                connection,
+            })
+        }
+
+        /// A path is only sent when it is relative to Media and cannot climb out.
+        fn checked(name: &str) -> Result<CString, DeviceError> {
+            if name.is_empty() || name.split('/').any(|part| part == "..") {
+                return Err(DeviceError::Path {
+                    path: name.to_owned(),
+                });
+            }
+            CString::new(name).map_err(|_| DeviceError::Path {
+                path: name.to_owned(),
+            })
+        }
+
+        /// What AFC says about a path: its size and kind, or None when it is absent.
+        pub fn stat(&self, path: &str) -> Option<(u64, String)> {
+            let symbols = symbols().ok()?;
+            let name = Self::checked(path).ok()?;
+            let mut info: CfType = std::ptr::null();
+            let status =
+                unsafe { (symbols.afc_file_info_open)(self.connection, name.as_ptr(), &mut info) };
+            if status != 0 || info.is_null() {
+                return None;
+            }
+            let mut size = 0_u64;
+            let mut kind = String::new();
+            loop {
+                let mut key: *mut c_char = std::ptr::null_mut();
+                let mut value: *mut c_char = std::ptr::null_mut();
+                let status = unsafe { (symbols.afc_key_value_read)(info, &mut key, &mut value) };
+                if status != 0 || key.is_null() || value.is_null() {
+                    break;
+                }
+                let key_text = unsafe { CStr::from_ptr(key) }.to_string_lossy();
+                let value_text = unsafe { CStr::from_ptr(value) }.to_string_lossy();
+                match key_text.as_ref() {
+                    "st_size" => size = value_text.parse().unwrap_or(0),
+                    "st_ifmt" => kind = value_text.into_owned(),
+                    _ => {}
+                }
+            }
+            unsafe { (symbols.afc_key_value_close)(info) };
+            Some((size, kind))
+        }
+
+        pub fn exists(&self, path: &str) -> bool {
+            self.stat(path).is_some()
+        }
+
+        /// Reads a file whole, refusing anything over `limit`.
+        pub fn read(&self, path: &str, limit: u64) -> Result<Vec<u8>, DeviceError> {
+            let symbols = symbols()?;
+            let (size, _kind) = self.stat(path).ok_or_else(|| DeviceError::AfcPath {
+                path: path.to_owned(),
+            })?;
+            if size > limit {
+                return Err(DeviceError::TooLarge {
+                    path: path.to_owned(),
+                    size,
+                    limit,
+                });
+            }
+            let name = Self::checked(path)?;
+            let mut file: CfType = std::ptr::null();
+            let status = unsafe {
+                (symbols.afc_file_ref_open)(self.connection, name.as_ptr(), 1, &mut file)
+            };
+            if status != 0 || file.is_null() {
+                return Err(DeviceError::Afc { status });
+            }
+
+            let mut data = vec![0_u8; size as usize];
+            let mut offset = 0_usize;
+            let mut failure = None;
+            while offset < data.len() {
+                let mut chunk = (data.len() - offset) as i64;
+                let status = unsafe {
+                    (symbols.afc_file_ref_read)(
+                        self.connection,
+                        file,
+                        data[offset..].as_mut_ptr() as *mut c_void,
+                        &mut chunk,
+                    )
+                };
+                if status != 0 || chunk <= 0 || chunk as usize > data.len() - offset {
+                    failure = Some(DeviceError::Afc { status });
+                    break;
+                }
+                offset += chunk as usize;
+            }
+            let closed = unsafe { (symbols.afc_file_ref_close)(self.connection, file) };
+            if let Some(error) = failure {
+                return Err(error);
+            }
+            if closed != 0 {
+                return Err(DeviceError::Afc { status: closed });
+            }
+            Ok(data)
+        }
+
+        /// Writes a file whole, creating or truncating it.
+        pub fn write(&self, path: &str, data: &[u8]) -> Result<(), DeviceError> {
+            let symbols = symbols()?;
+            let name = Self::checked(path)?;
+            let mut file: CfType = std::ptr::null();
+            let status = unsafe {
+                (symbols.afc_file_ref_open)(self.connection, name.as_ptr(), 3, &mut file)
+            };
+            if status != 0 || file.is_null() {
+                return Err(DeviceError::Afc { status });
+            }
+            let written = if data.is_empty() {
+                0
+            } else {
+                unsafe {
+                    (symbols.afc_file_ref_write)(
+                        self.connection,
+                        file,
+                        data.as_ptr() as *const c_void,
+                        data.len() as i64,
+                    )
+                }
+            };
+            let closed = unsafe { (symbols.afc_file_ref_close)(self.connection, file) };
+            if written != 0 {
+                return Err(DeviceError::Afc { status: written });
+            }
+            if closed != 0 {
+                return Err(DeviceError::Afc { status: closed });
+            }
+            Ok(())
+        }
+
+        pub fn create_directory(&self, path: &str) -> Result<(), DeviceError> {
+            let symbols = symbols()?;
+            let name = Self::checked(path)?;
+            let status =
+                unsafe { (symbols.afc_directory_create)(self.connection, name.as_ptr()) };
+            if status != 0 {
+                return Err(DeviceError::Afc { status });
+            }
+            Ok(())
+        }
+
+        /// Removes a file, or a directory and everything under it.
+        ///
+        /// Verifies afterwards: an AFC remove that reports success and leaves the
+        /// file behind would be worse than a failure, since callers rely on this to
+        /// prove a skin is gone from a card.
+        pub fn remove(&self, path: &str) -> Result<(), DeviceError> {
+            let symbols = symbols()?;
+            let name = Self::checked(path)?;
+            let status = unsafe { (symbols.afc_remove_path)(self.connection, name.as_ptr()) };
+            if status != 0 {
+                return Err(DeviceError::Afc { status });
+            }
+            if self.exists(path) {
+                return Err(DeviceError::StillThere {
+                    path: path.to_owned(),
+                });
+            }
+            Ok(())
+        }
+
+        /// Directory contents, with `.` and `..` left out.
+        pub fn list(&self, path: &str) -> Result<Vec<String>, DeviceError> {
+            let symbols = symbols()?;
+            let name = Self::checked(path)?;
+            let mut directory: CfType = std::ptr::null();
+            let status = unsafe {
+                (symbols.afc_directory_open)(self.connection, name.as_ptr(), &mut directory)
+            };
+            if status != 0 || directory.is_null() {
+                return Err(DeviceError::Afc { status });
+            }
+            let mut entries = Vec::new();
+            loop {
+                let mut entry: *mut c_char = std::ptr::null_mut();
+                let status =
+                    unsafe { (symbols.afc_directory_read)(self.connection, directory, &mut entry) };
+                if status != 0 || entry.is_null() {
+                    break;
+                }
+                let text = unsafe { CStr::from_ptr(entry) }
+                    .to_string_lossy()
+                    .into_owned();
+                if text != "." && text != ".." {
+                    entries.push(text);
+                }
+            }
+            unsafe { (symbols.afc_directory_close)(self.connection, directory) };
+            entries.sort();
+            Ok(entries)
+        }
+    }
+
+    impl Drop for AfcSession {
+        fn drop(&mut self) {
+            let Ok(symbols) = symbols() else { return };
+            unsafe {
+                if !self.connection.is_null() {
+                    (symbols.afc_close)(self.connection);
+                }
+                if !self.service.is_null() {
+                    (symbols.service_invalidate)(self.service);
+                }
+                (symbols.stop_session)(self.device.0);
+                (symbols.disconnect)(self.device.0);
+            }
+            // The retained device is released by DeviceHandle's own Drop.
+        }
+    }
+
+    #[cfg(test)]
+    mod afc_tests {
+        use super::*;
+
+        /// The device to test against: AIRCARD_TEST_UDID, or the only one plugged in.
+        pub fn test_device() -> String {
+            if let Ok(udid) = std::env::var("AIRCARD_TEST_UDID") {
+                return udid;
+            }
+            let devices = list_devices().expect("discovery runs");
+            assert_eq!(
+                devices.len(),
+                1,
+                "set AIRCARD_TEST_UDID to choose between {devices:#?}"
+            );
+            devices[0].udid.clone()
+        }
+
+        #[test]
+        #[ignore = "needs an iPhone attached"]
+        fn media_is_listed_the_way_the_device_reported_it() {
+            let session = AfcSession::open(&test_device()).expect("afc opens");
+            let entries = session.list("/").expect("media lists");
+            println!("{entries:#?}");
+            for expected in ["DCIM", "Airlock", "Books"] {
+                assert!(
+                    entries.iter().any(|name| name == expected),
+                    "{expected} is missing from {entries:?}"
+                );
+            }
+        }
+
+        #[test]
+        #[ignore = "needs an iPhone attached"]
+        fn a_file_can_be_written_read_and_removed() {
+            let session = AfcSession::open(&test_device()).expect("afc opens");
+            let path = "/aircard-afc-probe.txt";
+            let payload = b"aircard probe: written over afc\n";
+            let _ = session.remove(path);
+
+            session.write(path, payload).expect("write");
+            assert!(session.exists(path), "the file should be there after writing");
+            assert_eq!(session.read(path, 4096).expect("read"), payload);
+
+            session.remove(path).expect("remove");
+            assert!(!session.exists(path), "the probe must not be left behind");
+        }
+
+        #[test]
+        #[ignore = "needs an iPhone attached"]
+        fn a_path_cannot_climb_out_of_media() {
+            // This is why the escape exists. AFC's root is Media, and it says so.
+            let session = AfcSession::open(&test_device()).expect("afc opens");
+            let outside = "/../Library/Passes/Cards";
+            assert!(session.list(outside).is_err(), "traversal must be refused");
+            assert!(!session.exists(outside));
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -506,14 +1029,14 @@ mod macos {
 }
 
 #[cfg(target_os = "macos")]
-pub use macos::{list_devices, DeviceError, DeviceInfo};
+pub use macos::{list_devices, AfcSession, DeviceError, DeviceInfo};
 
 #[cfg(not(target_os = "macos"))]
 mod elsewhere {
     use serde::Serialize;
     use thiserror::Error;
 
-    #[derive(Debug, Error)]
+    #[derive(Debug, Clone, Error)]
     pub enum DeviceError {
         #[error("device access needs a Mac: the escape goes through Apple's AirTraffic framework")]
         Unsupported,

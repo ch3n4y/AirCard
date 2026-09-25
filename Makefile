@@ -6,16 +6,19 @@
 #
 # `make test` is the fast suite: the two library crates, no Tauri and no window.
 
-.PHONY: test test-legacy test-all check front install dev bundle clean
+.PHONY: test test-all test-legacy test-device check front install dev bundle sign clean
 
 test: ## library tests only (fast, no window)
-	cargo test -p aircard-core -p aircard-device
+	cargo test -p aircard-core -p aircard-device -p aircard-apple-ffi
 
 test-all: ## every Rust test, including the Tauri shell
 	cargo test --workspace
 
 test-legacy: ## the ported Python suite, still the spec
 	cd legacy && python3 -m unittest discover -s tests
+
+test-device: ## hardware tests, against a plugged-in iPhone; one session at a time
+	cargo test -p aircard-apple-ffi -- --ignored --nocapture --test-threads=1
 
 check: ## types and the whole workspace, without running tests
 	npm run check
