@@ -1,167 +1,288 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useState } from "react";
+import { App as AntApp, ConfigProvider, Flex, Tabs, Tag, Typography } from "antd";
+import zhCN from "antd/locale/zh_CN";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { open } from "@tauri-apps/plugin-dialog";
+
 import {
-  Alert,
-  App as AntApp,
-  Card,
-  ConfigProvider,
-  Descriptions,
-  Empty,
-  Flex,
-  List,
-  Tag,
-  Typography,
-} from "antd";
+  api,
+  type AppPaths,
+  type Card,
+  type DeviceInfo,
+  type FlashResult,
+  type ScanStatus,
+} from "./api";
+import { CardsPanel } from "./components/CardsPanel";
+import { DeviceBar } from "./components/DeviceBar";
+import { FlashPanel } from "./components/FlashPanel";
+import { MaintenancePanel } from "./components/MaintenancePanel";
+import { t } from "./strings";
+import type { Run } from "./ui";
 
-type AppPaths = { backups: string; artwork_cache: string; log_file: string };
-
-type DeviceInfo = {
-  udid: string;
-  name: string;
-  product: string;
-  version: string;
-  build: string;
-  language: string;
-  locale: string;
-  connection: string;
-  bold_text: boolean | null;
-};
+const IMAGE_FILES = /\.(png|jpe?g|heic|webp|tiff|gif|bmp)$/i;
 
 /**
- * What the app knows right now: which iPhones it can reach, and which cards on
- * this Mac still have their original artwork saved.
+ * 整个窗口。
  *
- * The saved originals were written by the previous implementation, in the same
- * layout, so this doubles as proof that the Rust core reads that data unchanged.
- * Flashing and scanning come next.
+ * 三件东西放在这里，因为别的组件都要用：连着哪台 iPhone、选中了哪些卡片、以及**当前
+ * 有没有操作正在跑**。最后一条不是界面上的讲究——同一台手机上不能有两个会话，否则进程
+ * 直接崩，所以任何时刻只允许一个操作，界面靠这个字段把按钮关掉。
  */
-function AirCard() {
+export function AirCard() {
+  const { message } = AntApp.useApp();
   const [paths, setPaths] = useState<AppPaths | null>(null);
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [udid, setUdid] = useState<string | null>(null);
   const [deviceProblem, setDeviceProblem] = useState<string | null>(null);
-  const [originals, setOriginals] = useState<Record<string, string[]>>({});
-  const [problem, setProblem] = useState<string | null>(null);
+  const [cards, setCards] = useState<Card[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [scan, setScan] = useState<ScanStatus | null>(null);
+  const [image, setImage] = useState<{ path: string; preview: string } | null>(null);
+  const [results, setResults] = useState<FlashResult[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [dropping, setDropping] = useState(false);
 
-  useEffect(() => {
-    (async () => {
+  const run: Run = useCallback(
+    async (label, work) => {
+      setBusy(label);
       try {
-        try {
-          setDevices(await invoke<DeviceInfo[]>("list_devices"));
-        } catch (error) {
-          setDeviceProblem(String(error));
-        }
-
-        const found = await invoke<string[]>("devices_with_saved_originals");
-        const byDevice: Record<string, string[]> = {};
-        for (const udid of found) {
-          byDevice[udid] = await invoke<string[]>("saved_originals", { udid });
-        }
-        setOriginals(byDevice);
-        setPaths(await invoke<AppPaths>("app_paths"));
+        await work();
       } catch (error) {
-        setProblem(String(error));
+        message.error(String(error));
+      } finally {
+        setBusy(null);
       }
-    })();
+    },
+    [message],
+  );
+
+  const refreshDevices = useCallback(async () => {
+    try {
+      const found = await api.devices();
+      setDevices(found);
+      setDeviceProblem(null);
+      setUdid((current) =>
+        current && found.some((item) => item.udid === current)
+          ? current
+          : (found[0]?.udid ?? null),
+      );
+    } catch (error) {
+      setDevices([]);
+      setDeviceProblem(String(error));
+    }
   }, []);
 
+  const refreshCards = useCallback(async () => {
+    if (!udid) {
+      setCards([]);
+      return;
+    }
+    setCards(await api.cards(udid));
+  }, [udid]);
+
+  useEffect(() => {
+    void refreshDevices();
+    void api
+      .paths()
+      .then(setPaths)
+      .catch(() => setPaths(null));
+  }, [refreshDevices]);
+
+  useEffect(() => {
+    setSelected([]);
+    void refreshCards().catch(() => setCards([]));
+  }, [refreshCards]);
+
+  // 扫描期间每秒问一次后端读到哪儿了；扫描停下来就不再问。扫描结束后把结果并进
+  // 列表——那是这次扫描唯一值得留下的东西。
+  useEffect(() => {
+    if (scan?.running !== true) return;
+    let stopped = false;
+    const timer = window.setInterval(() => {
+      void api
+        .scanStatus()
+        .then((status) => {
+          if (!stopped) setScan(status);
+        })
+        .catch(() => undefined);
+    }, 1000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [scan?.running]);
+
+  useEffect(() => {
+    if (scan?.running !== false || !udid || (scan.found.length ?? 0) === 0) return;
+    void api
+      .foldScan(udid)
+      .then(() => refreshCards())
+      .catch(() => undefined);
+  }, [scan?.running, scan?.found.length, udid, refreshCards]);
+
+  const loadImage = useCallback(
+    async (path: string) => {
+      await run(t.loadingImage, async () => {
+        const preview = await api.imagePreview(path);
+        if (!preview) throw new Error(t.needImage);
+        setImage({ path, preview });
+        setResults(null);
+      });
+    },
+    [run],
+  );
+
+  const pickImage = useCallback(async () => {
+    const chosen = await open({
+      multiple: false,
+      directory: false,
+      filters: [
+        {
+          name: "图片",
+          extensions: ["png", "jpg", "jpeg", "heic", "webp", "tiff", "gif", "bmp"],
+        },
+      ],
+    });
+    if (typeof chosen === "string") await loadImage(chosen);
+  }, [loadImage]);
+
+  // 拖进来的图片：原生拖放才能拿到真实路径，浏览器那套 onDrop 拿不到。
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type === "over") {
+          setDropping(true);
+          return;
+        }
+        setDropping(false);
+        if (event.payload.type !== "drop") return;
+        const path = event.payload.paths.find((dropped) => IMAGE_FILES.test(dropped));
+        if (path) void loadImage(path);
+      })
+      .then((stop) => {
+        unlisten = stop;
+      });
+    return () => unlisten?.();
+  }, [loadImage]);
+
+  const startScan = () =>
+    void run(t.scanCards, async () => {
+      if (!udid) throw new Error(t.connectHint);
+      setResults(null);
+      await api.startScan(udid);
+      setScan({ running: true, lines_read: 0, found: [] });
+    });
+
+  const flash = () =>
+    void run(t.flashingCards, async () => {
+      if (!udid) throw new Error(t.connectHint);
+      if (!image) throw new Error(t.needImage);
+      if (selected.length === 0) throw new Error(t.needCards);
+      const outcome = await api.flash(udid, selected, image.path);
+      setResults(outcome);
+      await refreshCards();
+    });
+
+  const onCardsChanged = () =>
+    void refreshCards().catch(() => undefined);
+
+  const cardTab = (
+    <CardsPanel
+      udid={udid}
+      cards={cards}
+      scan={scan}
+      selected={selected}
+      busy={busy}
+      run={run}
+      onSelectionChange={setSelected}
+      onCardsChanged={onCardsChanged}
+      onRefreshScanRecord={onCardsChanged}
+      onStartScan={startScan}
+      onStopScan={() => void api.stopScan()}
+    />
+  );
+
   return (
-    <ConfigProvider>
-      <AntApp>
-        <Flex vertical gap={16} style={{ padding: 24, maxWidth: 880, margin: "0 auto" }}>
-          <Typography.Title level={3} style={{ marginBottom: 0 }}>
-            AirCard
+    <Flex
+      vertical
+      gap={12}
+      style={{ padding: 16, height: "100%", boxSizing: "border-box" }}
+    >
+      <Flex align="center" justify="space-between" gap={12} wrap>
+        <Flex align="baseline" gap={8}>
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            {t.app}
           </Typography.Title>
-          <Typography.Text type="secondary">
-            Replacement artwork for Apple Wallet cards.
-          </Typography.Text>
-
-          {problem && <Alert type="error" showIcon message={problem} />}
-
-          {deviceProblem ? (
-            <Alert type="warning" showIcon message={deviceProblem} />
-          ) : devices.length === 0 ? (
-            <Alert
-              type="info"
-              showIcon
-              message="No iPhone connected"
-              description="Connect one over USB and unlock it, then reopen this window."
-            />
-          ) : (
-            devices.map((device) => (
-              <Card
-                key={device.udid}
-                size="small"
-                title={
-                  <Flex gap={8} align="center">
-                    <span>{device.name || "iPhone"}</span>
-                    <Tag color={device.connection === "usb" ? "green" : "blue"}>
-                      {device.connection}
-                    </Tag>
-                  </Flex>
-                }
-              >
-                <Descriptions size="small" column={2}>
-                  <Descriptions.Item label="Model">{device.product || "—"}</Descriptions.Item>
-                  <Descriptions.Item label="iOS">
-                    {device.version ? `${device.version} (${device.build})` : "—"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Language">{device.language || "—"}</Descriptions.Item>
-                  <Descriptions.Item label="UDID">
-                    <Typography.Text code copyable>
-                      {device.udid}
-                    </Typography.Text>
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
-            ))
-          )}
-
-          <Typography.Title level={5} style={{ marginBottom: 0 }}>
-            Saved originals on this Mac
-          </Typography.Title>
-          {Object.keys(originals).length === 0 ? (
-            <Empty description="Nothing saved yet" />
-          ) : (
-            Object.entries(originals).map(([udid, cards]) => (
-              <Card
-                key={udid}
-                size="small"
-                title={<Typography.Text code>{udid}</Typography.Text>}
-                extra={<Typography.Text type="secondary">{cards.length} cards</Typography.Text>}
-              >
-                <List
-                  size="small"
-                  dataSource={cards}
-                  renderItem={(card) => (
-                    <List.Item>
-                      <Typography.Text code>{card}</Typography.Text>
-                    </List.Item>
-                  )}
-                />
-              </Card>
-            ))
-          )}
-
-          {paths && (
-            <Card size="small" title="On this Mac">
-              <Flex vertical gap={2}>
-                <Typography.Text type="secondary">
-                  Saved originals: <Typography.Text code>{paths.backups}</Typography.Text>
-                </Typography.Text>
-                <Typography.Text type="secondary">
-                  Artwork read from the phone:{" "}
-                  <Typography.Text code>{paths.artwork_cache}</Typography.Text>
-                </Typography.Text>
-                <Typography.Text type="secondary">
-                  Log: <Typography.Text code>{paths.log_file}</Typography.Text>
-                </Typography.Text>
-              </Flex>
-            </Card>
-          )}
+          <Typography.Text type="secondary">{t.subtitle}</Typography.Text>
         </Flex>
+        <Flex gap={8} align="center" wrap>
+          {t.guide.map((step, index) => (
+            <Tag key={step}>
+              {index + 1} {step}
+            </Tag>
+          ))}
+        </Flex>
+      </Flex>
+
+      <DeviceBar
+        devices={devices}
+        selected={udid}
+        problem={deviceProblem}
+        busy={busy}
+        onSelect={setUdid}
+        onRefresh={() => void run(t.refreshDevices, refreshDevices)}
+      />
+
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+        <Tabs
+          activeKey={dropping ? "flash" : undefined}
+          items={[
+            { key: "cards", label: t.cards, children: cardTab },
+            {
+              key: "flash",
+              label: t.flash,
+              children: (
+                <FlashPanel
+                  cards={cards}
+                  selected={selected}
+                  image={image}
+                  results={results}
+                  busy={busy}
+                  onPick={() => void pickImage()}
+                  onFlash={flash}
+                />
+              ),
+            },
+            {
+              key: "maintenance",
+              label: t.maintenance,
+              children: (
+                <MaintenancePanel
+                  udid={udid}
+                  paths={paths}
+                  busy={busy}
+                  run={run}
+                />
+              ),
+            },
+          ]}
+        />
+      </div>
+
+      <Typography.Text type={busy ? "warning" : "secondary"}>
+        {busy ? `${busy}…` : t.ready}
+      </Typography.Text>
+    </Flex>
+  );
+}
+
+export default function App() {
+  return (
+    <ConfigProvider locale={zhCN}>
+      <AntApp>
+        <AirCard />
       </AntApp>
     </ConfigProvider>
   );
 }
-
-export default AirCard;
