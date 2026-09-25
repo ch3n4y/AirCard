@@ -20,7 +20,7 @@
 #[cfg(target_os = "macos")]
 mod macos {
     use std::cell::{Cell, RefCell};
-    use std::ffi::{c_char, c_int, c_void, CStr, CString};
+    use std::ffi::{c_char, c_int, c_long, c_void, CStr, CString};
     use std::sync::OnceLock;
 
     use serde::Serialize;
@@ -34,6 +34,21 @@ mod macos {
 
     /// `message` value that means "device attached".
     const ATTACHED: u32 = 1;
+
+    /// `kCFPropertyListBinaryFormat_v1_0`: the only format `os_trace_relay`, and
+    /// every other MobileDevice service, accepts for a request plist.
+    const BINARY_PLIST: c_int = 200;
+
+    /// `kCFNumberSInt64Type`. The request carries `UINT32_MAX` as a pid, so the
+    /// number is built 64-bit wide rather than risking a sign flip.
+    const SINT64: isize = 4;
+
+    /// `com.apple.os_trace_relay` frame cap. Anything larger is corrupt, and is
+    /// rejected before the payload is allocated.
+    const MAX_FRAME_LENGTH: u32 = 16 * 1024 * 1024;
+
+    /// Every activity record opens with this fixed header before its payload.
+    const RECORD_HEADER: usize = 129;
 
     type CfType = *const c_void;
     type CfString = *const c_void;
@@ -76,6 +91,14 @@ mod macos {
         TooLarge { path: String, size: u64, limit: u64 },
         #[error("{path} is still there after removing it")]
         StillThere { path: String },
+        #[error("the device log stream ended unexpectedly")]
+        LogEnded,
+        #[error("the device returned an invalid log frame: {detail}")]
+        LogFrame { detail: String },
+        #[error("the device refused to start log streaming")]
+        LogRefused,
+        #[error("the device's log reply could not be decoded")]
+        LogReply,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -106,6 +129,12 @@ mod macos {
         ) -> CfDictionary,
         cf_release: unsafe extern "C" fn(CfType),
         cf_run_loop_run: unsafe extern "C" fn(CfType, f64, u8) -> c_int,
+        // Building the StartActivity plist request and decoding the plist reply.
+        cf_number_create: unsafe extern "C" fn(CfAllocator, isize, *const c_void) -> CfType,
+        cf_data_create: unsafe extern "C" fn(CfAllocator, *const u8, CfIndex) -> CfType,
+        cf_property_list_create:
+            unsafe extern "C" fn(CfAllocator, CfType, u64, *mut CfIndex, *mut CfType) -> CfType,
+        cf_dictionary_get_value: unsafe extern "C" fn(CfDictionary, CfType) -> CfType,
         k_cf_true: CfType,
         k_cf_false: CfType,
         k_run_loop_default_mode: CfType,
@@ -138,6 +167,9 @@ mod macos {
         service_socket: unsafe extern "C" fn(CfType) -> c_int,
         service_secure_context: unsafe extern "C" fn(CfType) -> *mut c_void,
         service_invalidate: unsafe extern "C" fn(CfType) -> c_int,
+        // os_trace_relay reads and writes whole plists over the service connection.
+        service_receive: unsafe extern "C" fn(CfType, *mut c_void, c_long) -> c_long,
+        service_send_message: unsafe extern "C" fn(CfType, CfType, c_int) -> c_int,
         cf_retain: unsafe extern "C" fn(CfType) -> CfType,
         cf_run_loop_stop: unsafe extern "C" fn(CfType),
         cf_run_loop_current: unsafe extern "C" fn() -> CfType,
@@ -217,6 +249,10 @@ mod macos {
                     cf_dictionary_create: function(handle, "CFDictionaryCreate")?,
                     cf_release: function(handle, "CFRelease")?,
                     cf_run_loop_run: function(handle, "CFRunLoopRunInMode")?,
+                    cf_number_create: function(handle, "CFNumberCreate")?,
+                    cf_data_create: function(handle, "CFDataCreate")?,
+                    cf_property_list_create: function(handle, "CFPropertyListCreateWithData")?,
+                    cf_dictionary_get_value: function(handle, "CFDictionaryGetValue")?,
                     k_cf_true: data_pointer(handle, "kCFBooleanTrue")?,
                     k_cf_false: data_pointer(handle, "kCFBooleanFalse")?,
                     k_run_loop_default_mode: data_pointer(handle, "kCFRunLoopDefaultMode")?,
@@ -239,15 +275,23 @@ mod macos {
                     stop_session: function(handle, "AMDeviceStopSession")?,
                     secure_start_service: function(handle, "AMDeviceSecureStartService")?,
                     service_socket: function(handle, "AMDServiceConnectionGetSocket")?,
-                    service_secure_context: function(handle, "AMDServiceConnectionGetSecureIOContext")?,
+                    service_secure_context: function(
+                        handle,
+                        "AMDServiceConnectionGetSecureIOContext",
+                    )?,
                     service_invalidate: function(handle, "AMDServiceConnectionInvalidate")?,
+                    service_receive: function(handle, "AMDServiceConnectionReceive")?,
+                    service_send_message: function(handle, "AMDServiceConnectionSendMessage")?,
                     cf_retain: function(handle, "CFRetain")?,
                     cf_run_loop_stop: function(handle, "CFRunLoopStop")?,
                     cf_run_loop_current: function(handle, "CFRunLoopGetCurrent")?,
                     afc_open: function(handle, "AFCConnectionOpen")?,
                     afc_close: function(handle, "AFCConnectionClose")?,
                     afc_set_secure_context: function(handle, "AFCConnectionSetSecureContext")?,
-                    afc_set_dispose_secure_context: function(handle, "AFCConnectionSetDisposeSecureContextOnInvalidate")?,
+                    afc_set_dispose_secure_context: function(
+                        handle,
+                        "AFCConnectionSetDisposeSecureContextOnInvalidate",
+                    )?,
                     afc_set_io_timeout: function(handle, "AFCConnectionSetIOTimeout")?,
                     afc_file_info_open: function(handle, "AFCFileInfoOpen")?,
                     afc_key_value_read: function(handle, "AFCKeyValueRead")?,
@@ -613,6 +657,58 @@ mod macos {
         Ok(DeviceHandle(target))
     }
 
+    /// Connects, pairs and starts a session, then opens one secure service.
+    ///
+    /// AFC and the log stream share this dance -- connect, pair, validate, start
+    /// a session -- before either can name the service it wants. Kept private so
+    /// the public shapes stay `AfcSession` and `LogStream`.
+    fn open_service(udid: &str, service_name: &str) -> Result<(DeviceHandle, CfType), DeviceError> {
+        let symbols = symbols()?;
+        let device = find_device(udid, 30.0)?;
+
+        let status = unsafe { (symbols.connect)(device.0) };
+        if status != 0 {
+            return Err(DeviceError::Connect { status });
+        }
+        if unsafe { (symbols.is_paired)(device.0) } == 0 {
+            unsafe { (symbols.pair)(device.0) };
+        }
+        let mut validated = unsafe { (symbols.validate_pairing)(device.0) };
+        if validated != 0 {
+            // Pair again and retry once, the way the previous helper did.
+            unsafe { (symbols.pair)(device.0) };
+            validated = unsafe { (symbols.validate_pairing)(device.0) };
+        }
+        if validated != 0 {
+            unsafe { (symbols.disconnect)(device.0) };
+            return Err(DeviceError::Pairing { status: validated });
+        }
+        let status = unsafe { (symbols.start_session)(device.0) };
+        if status != 0 {
+            unsafe { (symbols.disconnect)(device.0) };
+            return Err(DeviceError::Session { status });
+        }
+
+        let Some((name, _name_owned)) = cf_string(symbols, service_name) else {
+            unsafe { (symbols.stop_session)(device.0) };
+            unsafe { (symbols.disconnect)(device.0) };
+            return Err(DeviceError::Framework {
+                detail: format!("could not name the {service_name} service"),
+            });
+        };
+        let mut service: CfType = std::ptr::null();
+        let status = unsafe {
+            (symbols.secure_start_service)(device.0, name, std::ptr::null(), &mut service)
+        };
+        unsafe { (symbols.cf_release)(name) };
+        if status != 0 || service.is_null() {
+            unsafe { (symbols.stop_session)(device.0) };
+            unsafe { (symbols.disconnect)(device.0) };
+            return Err(DeviceError::Service { status });
+        }
+        Ok((device, service))
+    }
+
     /// A live AFC connection to one iPhone.
     ///
     /// This reaches `/var/mobile/Media` and nothing else. A card's files live in
@@ -634,61 +730,11 @@ mod macos {
         /// Opens `com.apple.afc` on one iPhone.
         pub fn open(udid: &str) -> Result<Self, DeviceError> {
             let symbols = symbols()?;
-            let device = find_device(udid, 30.0)?;
-
-            let status = unsafe { (symbols.connect)(device.0) };
-            if status != 0 {
-                return Err(DeviceError::Connect { status });
-            }
-            if unsafe { (symbols.is_paired)(device.0) } == 0 {
-                unsafe { (symbols.pair)(device.0) };
-            }
-            let mut validated = unsafe { (symbols.validate_pairing)(device.0) };
-            if validated != 0 {
-                // Pair again and retry once, the way the previous helper did.
-                unsafe { (symbols.pair)(device.0) };
-                validated = unsafe { (symbols.validate_pairing)(device.0) };
-            }
-            if validated != 0 {
-                unsafe { (symbols.disconnect)(device.0) };
-                return Err(DeviceError::Pairing { status: validated });
-            }
-            let status = unsafe { (symbols.start_session)(device.0) };
-            if status != 0 {
-                unsafe { (symbols.disconnect)(device.0) };
-                return Err(DeviceError::Session { status });
-            }
-
-            let Some((service_name, _name_owned)) = cf_string(symbols, "com.apple.afc") else {
-                unsafe { (symbols.stop_session)(device.0) };
-                unsafe { (symbols.disconnect)(device.0) };
-                return Err(DeviceError::Framework {
-                    detail: "could not name the afc service".to_owned(),
-                });
-            };
-            let mut service: CfType = std::ptr::null();
-            let status = unsafe {
-                (symbols.secure_start_service)(
-                    device.0,
-                    service_name,
-                    std::ptr::null(),
-                    &mut service,
-                )
-            };
-            unsafe { (symbols.cf_release)(service_name) };
-            if status != 0 || service.is_null() {
-                unsafe { (symbols.stop_session)(device.0) };
-                unsafe { (symbols.disconnect)(device.0) };
-                return Err(DeviceError::Service { status });
-            }
+            let (device, service) = open_service(udid, "com.apple.afc")?;
 
             let mut connection: CfType = std::ptr::null();
             let status = unsafe {
-                (symbols.afc_open)(
-                    (symbols.service_socket)(service),
-                    0,
-                    &mut connection,
-                )
+                (symbols.afc_open)((symbols.service_socket)(service), 0, &mut connection)
             };
             if status != 0 || connection.is_null() {
                 unsafe { (symbols.service_invalidate)(service) };
@@ -849,8 +895,7 @@ mod macos {
         pub fn create_directory(&self, path: &str) -> Result<(), DeviceError> {
             let symbols = symbols()?;
             let name = Self::checked(path)?;
-            let status =
-                unsafe { (symbols.afc_directory_create)(self.connection, name.as_ptr()) };
+            let status = unsafe { (symbols.afc_directory_create)(self.connection, name.as_ptr()) };
             if status != 0 {
                 return Err(DeviceError::Afc { status });
             }
@@ -926,6 +971,360 @@ mod macos {
         }
     }
 
+    /// One decoded frame: the type byte plus its payload.
+    struct Frame {
+        kind: u8,
+        payload: Vec<u8>,
+    }
+
+    /// A byte source the framing decoder reads from.
+    ///
+    /// The decoder only ever needs exact-length reads, but a service connection
+    /// can hand back short reads, so `read_exact` loops over `read` and the tests
+    /// can make `read` return tiny fragments. Abstracted from the service pointer
+    /// so framing, endianness and the record layout are testable with no iPhone.
+    trait ByteSource {
+        /// Returns up to `bytes.len()` bytes; fewer means the stream is ending.
+        fn read(&mut self, bytes: &mut [u8]) -> Result<usize, DeviceError>;
+
+        /// Fills `bytes` completely, looping over short reads.
+        fn read_exact(&mut self, bytes: &mut [u8]) -> Result<(), DeviceError> {
+            let mut offset = 0;
+            while offset < bytes.len() {
+                let count = self.read(&mut bytes[offset..])?;
+                if count == 0 || count > bytes.len() - offset {
+                    return Err(DeviceError::LogEnded);
+                }
+                offset += count;
+            }
+            Ok(())
+        }
+    }
+
+    /// The log service connection seen as a byte source.
+    struct ServiceSource<'a> {
+        symbols: &'a Symbols,
+        connection: CfType,
+    }
+
+    impl ByteSource for ServiceSource<'_> {
+        fn read(&mut self, bytes: &mut [u8]) -> Result<usize, DeviceError> {
+            let count = unsafe {
+                (self.symbols.service_receive)(
+                    self.connection,
+                    bytes.as_mut_ptr() as *mut c_void,
+                    bytes.len() as c_long,
+                )
+            };
+            if count <= 0 || count as usize > bytes.len() {
+                return Err(DeviceError::LogEnded);
+            }
+            Ok(count as usize)
+        }
+    }
+
+    /// Reads one frame: a type byte, a 32-bit length and the payload.
+    ///
+    /// Plist replies (type 1) carry their length big endian; activity records
+    /// (type 2) little endian. The split is not a mistake -- it is what
+    /// `os_trace_relay` sends, and libimobiledevice's `ostrace.c` reads it back
+    /// the same way. A corrupt length is rejected before anything is allocated.
+    fn read_frame(source: &mut impl ByteSource) -> Result<Frame, DeviceError> {
+        let mut header = [0_u8; 5];
+        source.read_exact(&mut header)?;
+        let kind = header[0];
+        let length = match kind {
+            1 => u32::from_be_bytes([header[1], header[2], header[3], header[4]]),
+            2 => u32::from_le_bytes([header[1], header[2], header[3], header[4]]),
+            _ => {
+                return Err(DeviceError::LogFrame {
+                    detail: format!("unsupported frame type {kind}"),
+                })
+            }
+        };
+        if length == 0 || length > MAX_FRAME_LENGTH {
+            return Err(DeviceError::LogFrame {
+                detail: format!("invalid frame length {length}"),
+            });
+        }
+        let mut payload = vec![0_u8; length as usize];
+        source.read_exact(&mut payload)?;
+        Ok(Frame { kind, payload })
+    }
+
+    fn u16_le(bytes: &[u8], offset: usize) -> Option<u16> {
+        let slice = bytes.get(offset..offset + 2)?;
+        Some(u16::from_le_bytes([slice[0], slice[1]]))
+    }
+
+    fn u32_le(bytes: &[u8], offset: usize) -> Option<u32> {
+        let slice = bytes.get(offset..offset + 4)?;
+        Some(u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]))
+    }
+
+    /// Drops the trailing NUL bytes the device pads its strings with.
+    fn trim_nul(bytes: &[u8]) -> &[u8] {
+        let mut end = bytes.len();
+        while end > 0 && bytes[end - 1] == 0 {
+            end -= 1;
+        }
+        &bytes[..end]
+    }
+
+    /// The text after the last `/`, matching `NSString.lastPathComponent`.
+    fn last_component(text: &str) -> &str {
+        match text.rfind('/') {
+            Some(index) => &text[index + 1..],
+            None => text,
+        }
+    }
+
+    /// Decodes one activity record to `"{process}({image}): {message}\n"`.
+    ///
+    /// The record opens with a 129-byte header and then carries three
+    /// length-delimited, NUL-padded UTF-8 strings: process, image, message. The
+    /// header length is at offset 5, the process length at 37, the image length
+    /// at 107 and the message length at 109 -- all little endian. Every length is
+    /// bounds-checked, so a truncated or corrupt record is refused rather than
+    /// indexed past its end. Multiline messages are kept whole: on iOS 18 the
+    /// Wallet card path shows up on a continuation line of CoreFoundation's
+    /// "Resource lookup" message.
+    fn decode_record(record: &[u8]) -> Option<String> {
+        if record.len() < RECORD_HEADER || record[0] != 2 {
+            return None;
+        }
+        let header_length = u32_le(record, 5)? as usize;
+        let process_length = u16_le(record, 37)? as usize;
+        let image_length = u16_le(record, 107)? as usize;
+        let message_length = u32_le(record, 109)? as usize;
+        let text_length = process_length
+            .checked_add(image_length)?
+            .checked_add(message_length)?;
+        if header_length < RECORD_HEADER
+            || header_length > record.len()
+            || process_length == 0
+            || message_length == 0
+            || text_length > record.len() - header_length
+        {
+            return None;
+        }
+
+        let text = &record[header_length..];
+        let process = trim_nul(&text[..process_length]);
+        let image = trim_nul(&text[process_length..process_length + image_length]);
+        let message_end = process_length + image_length + message_length;
+        let message = trim_nul(&text[process_length + image_length..message_end]);
+        Some(format!(
+            "{}({}): {}\n",
+            last_component(&String::from_utf8_lossy(process)),
+            last_component(&String::from_utf8_lossy(image)),
+            String::from_utf8_lossy(message),
+        ))
+    }
+
+    /// `CFNumberCreate` for a 64-bit signed value.
+    fn cf_number(symbols: &Symbols, value: i64) -> CfType {
+        unsafe {
+            (symbols.cf_number_create)(
+                std::ptr::null(),
+                SINT64,
+                &value as *const i64 as *const c_void,
+            )
+        }
+    }
+
+    /// The `StartActivity` request as a CFDictionary the service can send.
+    ///
+    /// `Pid` `UINT32_MAX` streams every process. The flags ask for payload,
+    /// historical, callstack and debug events -- the same set the previous helper
+    /// used, and the reason `syslog_relay` is not enough: it omits the Info/Debug
+    /// resource lookups that name Wallet cards on iOS 18.
+    fn activity_request(symbols: &Symbols) -> Option<CfDictionary> {
+        let mut keys: Vec<CfString> = Vec::with_capacity(4);
+        let mut values: Vec<CfType> = Vec::with_capacity(4);
+        // The CFStrings copy their bytes, but the CString backings must outlive
+        // the CFStringCreateWithCString calls, so they are held until the end.
+        let mut owned: Vec<CString> = Vec::with_capacity(4);
+
+        let (request_key, request_key_owned) = cf_string(symbols, "Request")?;
+        let (request_value, request_value_owned) = cf_string(symbols, "StartActivity")?;
+        keys.push(request_key);
+        values.push(request_value);
+        owned.push(request_key_owned);
+        owned.push(request_value_owned);
+
+        for (name, value) in [
+            ("Pid", u32::MAX as i64),
+            ("MessageFilter", 0xFFFF),
+            ("StreamFlags", 0x3C),
+        ] {
+            let (key, key_owned) = cf_string(symbols, name)?;
+            let number = cf_number(symbols, value);
+            if number.is_null() {
+                unsafe { (symbols.cf_release)(key) };
+                return None;
+            }
+            keys.push(key);
+            values.push(number);
+            owned.push(key_owned);
+        }
+
+        let dictionary = unsafe {
+            (symbols.cf_dictionary_create)(
+                std::ptr::null(),
+                keys.as_ptr(),
+                values.as_ptr(),
+                keys.len() as CfIndex,
+                symbols.k_dictionary_key_callbacks,
+                symbols.k_dictionary_value_callbacks,
+            )
+        };
+        // The dictionary retains its keys and values, so both vectors can go.
+        for reference in &keys {
+            unsafe { (symbols.cf_release)(*reference) };
+        }
+        for value in &values {
+            unsafe { (symbols.cf_release)(*value) };
+        }
+        drop(owned);
+        if dictionary.is_null() {
+            None
+        } else {
+            Some(dictionary)
+        }
+    }
+
+    /// Reads the plist reply that answers `StartActivity` and checks that it says
+    /// `RequestSuccessful`. Anything else means the relay refused to stream.
+    fn check_reply(symbols: &Symbols, service: CfType) -> Result<(), DeviceError> {
+        let mut source = ServiceSource {
+            symbols,
+            connection: service,
+        };
+        let frame = read_frame(&mut source)?;
+        if frame.kind != 1 {
+            return Err(DeviceError::LogReply);
+        }
+
+        let data = unsafe {
+            (symbols.cf_data_create)(
+                std::ptr::null(),
+                frame.payload.as_ptr(),
+                frame.payload.len() as CfIndex,
+            )
+        };
+        if data.is_null() {
+            return Err(DeviceError::LogReply);
+        }
+        let plist = unsafe {
+            (symbols.cf_property_list_create)(
+                std::ptr::null(),
+                data,
+                0, // kCFPropertyListImmutable
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        };
+        unsafe { (symbols.cf_release)(data) };
+        if plist.is_null() {
+            return Err(DeviceError::LogReply);
+        }
+
+        let Some((key, _key_owned)) = cf_string(symbols, "Status") else {
+            unsafe { (symbols.cf_release)(plist) };
+            return Err(DeviceError::LogReply);
+        };
+        let value = unsafe { (symbols.cf_dictionary_get_value)(plist, key) };
+        unsafe { (symbols.cf_release)(key) };
+        let accepted = !value.is_null() && read_cf_string(symbols, value) == "RequestSuccessful";
+        unsafe { (symbols.cf_release)(plist) };
+        if accepted {
+            Ok(())
+        } else {
+            Err(DeviceError::LogRefused)
+        }
+    }
+
+    /// A live `com.apple.os_trace_relay` stream from one iPhone.
+    ///
+    /// Same one-session-at-a-time rule as `AfcSession`: two sessions to the same
+    /// device at once abort the process, so callers serialise.
+    pub struct LogStream {
+        device: DeviceHandle,
+        service: CfType,
+    }
+
+    impl LogStream {
+        /// Opens the unified activity log stream on one iPhone.
+        pub fn open(udid: &str) -> Result<Self, DeviceError> {
+            let symbols = symbols()?;
+            let (device, service) = open_service(udid, "com.apple.os_trace_relay")?;
+
+            // Every failure past this point has to undo the session: the caller
+            // never receives a LogStream whose Drop would clean it up.
+            let started = match activity_request(symbols) {
+                Some(request) => {
+                    let status =
+                        unsafe { (symbols.service_send_message)(service, request, BINARY_PLIST) };
+                    unsafe { (symbols.cf_release)(request) };
+                    if status != 0 {
+                        Err(DeviceError::LogRefused)
+                    } else {
+                        check_reply(symbols, service)
+                    }
+                }
+                None => Err(DeviceError::Framework {
+                    detail: "could not build the log request".to_owned(),
+                }),
+            };
+
+            match started {
+                Ok(()) => Ok(Self { device, service }),
+                Err(error) => {
+                    unsafe {
+                        (symbols.service_invalidate)(service);
+                        (symbols.stop_session)(device.0);
+                        (symbols.disconnect)(device.0);
+                    }
+                    Err(error)
+                }
+            }
+        }
+
+        /// Pulls the next decoded log line.
+        ///
+        /// `Ok(None)` means the frame was not an activity record: the stream also
+        /// carries plist replies and other event kinds, and activity records that
+        /// do not hold a complete log line. `Err` means the stream ended or the
+        /// device sent something malformed.
+        pub fn next_line(&mut self) -> Result<Option<String>, DeviceError> {
+            let symbols = symbols()?;
+            let mut source = ServiceSource {
+                symbols,
+                connection: self.service,
+            };
+            let frame = read_frame(&mut source)?;
+            if frame.kind != 2 {
+                return Ok(None);
+            }
+            Ok(decode_record(&frame.payload))
+        }
+    }
+
+    impl Drop for LogStream {
+        fn drop(&mut self) {
+            let Ok(symbols) = symbols() else { return };
+            unsafe {
+                if !self.service.is_null() {
+                    (symbols.service_invalidate)(self.service);
+                }
+                (symbols.stop_session)(self.device.0);
+                (symbols.disconnect)(self.device.0);
+            }
+            // The retained device is released by DeviceHandle's own Drop.
+        }
+    }
+
     #[cfg(test)]
     mod afc_tests {
         use super::*;
@@ -967,7 +1366,10 @@ mod macos {
             let _ = session.remove(path);
 
             session.write(path, payload).expect("write");
-            assert!(session.exists(path), "the file should be there after writing");
+            assert!(
+                session.exists(path),
+                "the file should be there after writing"
+            );
             assert_eq!(session.read(path, 4096).expect("read"), payload);
 
             session.remove(path).expect("remove");
@@ -982,6 +1384,255 @@ mod macos {
             let outside = "/../Library/Passes/Cards";
             assert!(session.list(outside).is_err(), "traversal must be refused");
             assert!(!session.exists(outside));
+        }
+    }
+
+    /// Framing and record decoding, driven from memory instead of from a device.
+    ///
+    /// `legacy/tests/test_os_trace.m` drove the Objective-C version with this same
+    /// synthetic record, and the same cases are repeated here, so the port is
+    /// checked against that fixture rather than against whatever an iPhone happens
+    /// to log today.
+    #[cfg(test)]
+    mod log_tests {
+        use super::*;
+
+        /// The synthetic Info-level resource lookup: a 129-byte header, then the
+        /// NUL-padded process, image and message strings.
+        fn log_record() -> Vec<u8> {
+            let process = b"/usr/libexec/passd\0";
+            let image = b"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation\0";
+            let message = concat!(
+                "Resource lookup\n",
+                "\tResult        : file:///var/mobile/Library/Passes/Cards/",
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAA=.pkpass/en.lproj/actions.strings\0"
+            )
+            .as_bytes();
+
+            let mut record = vec![0_u8; RECORD_HEADER];
+            record[0] = 2;
+            record[1] = 8;
+            record[5] = RECORD_HEADER as u8;
+            record[37] = process.len() as u8;
+            record[68] = 1; // Info
+            record[107] = image.len() as u8;
+            record[109..113].copy_from_slice(&(message.len() as u32).to_le_bytes());
+            record.extend_from_slice(process);
+            record.extend_from_slice(image);
+            record.extend_from_slice(message);
+            record
+        }
+
+        /// One frame: the type byte, a length in that type's own byte order, payload.
+        fn frame(kind: u8, payload: &[u8]) -> Vec<u8> {
+            let length = payload.len() as u32;
+            let coded = if kind == 1 {
+                length.to_be_bytes()
+            } else {
+                length.to_le_bytes()
+            };
+            let mut wire = Vec::with_capacity(5 + payload.len());
+            wire.push(kind);
+            wire.extend_from_slice(&coded);
+            wire.extend_from_slice(payload);
+            wire
+        }
+
+        /// Wire bytes in memory, handed out in fragments so the short-read loop in
+        /// `read_exact` is exercised the way a service connection exercises it.
+        struct MemorySource {
+            bytes: Vec<u8>,
+            offset: usize,
+            chunk: usize,
+        }
+
+        impl MemorySource {
+            fn new(bytes: Vec<u8>, chunk: usize) -> Self {
+                Self {
+                    bytes,
+                    offset: 0,
+                    chunk,
+                }
+            }
+        }
+
+        impl ByteSource for MemorySource {
+            fn read(&mut self, bytes: &mut [u8]) -> Result<usize, DeviceError> {
+                let available = self.bytes.len() - self.offset;
+                let count = bytes.len().min(available).min(self.chunk);
+                bytes[..count].copy_from_slice(&self.bytes[self.offset..self.offset + count]);
+                self.offset += count;
+                Ok(count)
+            }
+        }
+
+        #[test]
+        fn the_fixture_record_decodes_to_a_log_line() {
+            let line = decode_record(&log_record()).expect("the fixture is a valid record");
+            println!("{line}");
+            assert!(
+                line.starts_with("passd(CoreFoundation): Resource lookup\n"),
+                "{line}"
+            );
+            assert!(
+                line.contains("/Cards/AAAAAAAAAAAAAAAAAAAAAAAAAAA=.pkpass/"),
+                "{line}"
+            );
+            assert!(line.ends_with("actions.strings\n"), "{line}");
+            assert!(!line.contains('\0'), "the padding must be trimmed: {line}");
+        }
+
+        #[test]
+        fn frames_use_big_endian_plists_and_little_endian_records() {
+            // A 0x0102 byte reply, so the length bytes are 0x00 0x00 0x01 0x02.
+            // Read little endian they would ask for 0x02010000 -- over the cap --
+            // so the two byte orders cannot be confused with each other here.
+            let mut reply = vec![1, 0, 0, 1, 2];
+            reply.resize(5 + 0x0102, 0xAA);
+            let mut source = MemorySource::new(reply, 4096);
+            let plist = read_frame(&mut source).expect("a type 1 frame reads");
+            assert_eq!(plist.kind, 1);
+            assert_eq!(plist.payload.len(), 0x0102);
+
+            let record = log_record();
+            let wire = frame(2, &record);
+            assert_eq!(wire[1], (record.len() & 0xFF) as u8);
+            assert_eq!(wire[2], (record.len() >> 8) as u8);
+            let mut source = MemorySource::new(wire, 4096);
+            let event = read_frame(&mut source).expect("a type 2 frame reads");
+            assert_eq!(event.kind, 2);
+            assert_eq!(event.payload, record);
+            assert!(decode_record(&event.payload).is_some());
+        }
+
+        #[test]
+        fn a_fragmented_stream_decodes_both_frames() {
+            // The device coalesces frames into one read and splits them inside a
+            // field, so the same wire is read one byte at a time, three bytes at a
+            // time and in one go.
+            let reply = frame(1, &[0x5A; 64]);
+            let record = log_record();
+            let mut wire = reply.clone();
+            wire.extend_from_slice(&frame(2, &record));
+
+            for chunk in [1, 3, 65536] {
+                let mut source = MemorySource::new(wire.clone(), chunk);
+                let ack = read_frame(&mut source).expect("the reply frame reads");
+                assert_eq!(ack.kind, 1);
+                assert_eq!(ack.payload, reply[5..]);
+                let event = read_frame(&mut source).expect("the record frame reads");
+                assert_eq!(event.kind, 2);
+                assert_eq!(event.payload, record);
+                assert!(
+                    decode_record(&event.payload).is_some(),
+                    "chunk {chunk} must decode"
+                );
+                // Then the stream ends, which is an error rather than a frame.
+                assert!(
+                    matches!(read_frame(&mut source), Err(DeviceError::LogEnded)),
+                    "chunk {chunk} must end"
+                );
+            }
+        }
+
+        #[test]
+        fn invalid_frames_are_rejected() {
+            // An unknown type byte, a zero length in either byte order, and a
+            // length over the 16 MiB cap: each is refused before its payload is
+            // allocated or waited for, and a header cut short is a truncated
+            // stream rather than a frame.
+            for wire in [
+                vec![3, 1, 0, 0, 0],
+                vec![2, 0, 0, 0, 0],
+                vec![1, 0, 0, 0, 0],
+                vec![2, 0xFF, 0xFF, 0xFF, 0x7F],
+                vec![2, 0, 0, 0],
+            ] {
+                let mut source = MemorySource::new(wire.clone(), 2);
+                assert!(read_frame(&mut source).is_err(), "{wire:?} must be refused");
+            }
+
+            // A payload that stops in the middle of the record.
+            let mut truncated = frame(2, &log_record());
+            truncated.truncate(10);
+            let mut source = MemorySource::new(truncated, 1);
+            assert!(matches!(
+                read_frame(&mut source),
+                Err(DeviceError::LogEnded)
+            ));
+        }
+
+        #[test]
+        fn malformed_records_are_rejected() {
+            let record = log_record();
+            assert!(
+                decode_record(&record).is_some(),
+                "the fixture has to be the reference"
+            );
+
+            // Shorter than the 129-byte header, and one byte short of the strings
+            // it declares.
+            assert!(decode_record(&record[..128]).is_none());
+            assert!(decode_record(&record[..record.len() - 1]).is_none());
+
+            // A header length or a message length of u32::MAX runs off the end.
+            for offset in [5, 109] {
+                let mut corrupt = record.clone();
+                corrupt[offset..offset + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+                assert!(decode_record(&corrupt).is_none(), "offset {offset}");
+            }
+
+            // A header that does not claim to be an activity record.
+            let mut corrupt = record.clone();
+            corrupt[0] = 1;
+            assert!(decode_record(&corrupt).is_none());
+
+            // The process and message lengths are the two the format insists on.
+            let mut corrupt = record.clone();
+            corrupt[37..39].copy_from_slice(&0_u16.to_le_bytes());
+            assert!(decode_record(&corrupt).is_none());
+            let mut corrupt = record.clone();
+            corrupt[109..113].copy_from_slice(&0_u32.to_le_bytes());
+            assert!(decode_record(&corrupt).is_none());
+        }
+
+        #[test]
+        #[ignore = "needs an iPhone attached"]
+        fn the_device_log_stream_emits_lines() {
+            // Two device sessions at once abort the process, so this runs with
+            // `--test-threads=1` like the other device tests.
+            let udid = super::afc_tests::test_device();
+            let mut stream = LogStream::open(&udid).expect("the log stream opens");
+            let mut lines = 0_usize;
+            let mut cards = 0_usize;
+            // The relay has no stop call: the stream ends when the service is
+            // invalidated, and Drop does that. Read a bounded number of frames.
+            for _ in 0..2000 {
+                match stream.next_line() {
+                    Ok(Some(line)) => {
+                        lines += 1;
+                        if lines <= 5 {
+                            println!("{line}");
+                        }
+                        if line.contains("/var/mobile/Library/Passes/Cards/") {
+                            cards += 1;
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        println!("the stream ended after {lines} lines: {error}");
+                        break;
+                    }
+                }
+                if lines >= 200 {
+                    break;
+                }
+            }
+            println!("{lines} log lines read, {cards} naming a Wallet card path");
+            assert!(
+                lines > 0,
+                "the device log stream produced no lines -- is the iPhone unlocked?"
+            );
         }
     }
 
@@ -1029,7 +1680,7 @@ mod macos {
 }
 
 #[cfg(target_os = "macos")]
-pub use macos::{list_devices, AfcSession, DeviceError, DeviceInfo};
+pub use macos::{list_devices, AfcSession, DeviceError, DeviceInfo, LogStream};
 
 #[cfg(not(target_os = "macos"))]
 mod elsewhere {
@@ -1060,7 +1711,21 @@ mod elsewhere {
     pub fn list_devices() -> Result<Vec<DeviceInfo>, DeviceError> {
         Err(DeviceError::Unsupported)
     }
+
+    /// The log stream is the os_trace_relay service, reached through the private
+    /// MobileDevice framework; away from macOS there is nothing to talk to.
+    pub struct LogStream;
+
+    impl LogStream {
+        pub fn open(_udid: &str) -> Result<Self, DeviceError> {
+            Err(DeviceError::Unsupported)
+        }
+
+        pub fn next_line(&mut self) -> Result<Option<String>, DeviceError> {
+            Err(DeviceError::Unsupported)
+        }
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
-pub use elsewhere::{list_devices, DeviceError, DeviceInfo};
+pub use elsewhere::{list_devices, DeviceError, DeviceInfo, LogStream};

@@ -93,8 +93,14 @@ mod tests {
     #[test]
     fn real_card_hashes_become_the_names_seen_on_the_device() {
         // Both of these were checked against the folder names on a real iPhone.
-        assert_eq!(slug("2Do5+0cj+vG1zMfmFbPt0D4GPKQ="), "2Do5%2B0cj%2BvG1zMfmFbPt0D4GPKQ%3D");
-        assert_eq!(slug("ql2MjCQ86Xc6xp7nPee-xDWNSRI="), "ql2MjCQ86Xc6xp7nPee-xDWNSRI%3D");
+        assert_eq!(
+            slug("2Do5+0cj+vG1zMfmFbPt0D4GPKQ="),
+            "2Do5%2B0cj%2BvG1zMfmFbPt0D4GPKQ%3D"
+        );
+        assert_eq!(
+            slug("ql2MjCQ86Xc6xp7nPee-xDWNSRI="),
+            "ql2MjCQ86Xc6xp7nPee-xDWNSRI%3D"
+        );
     }
 
     #[test]

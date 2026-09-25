@@ -83,7 +83,8 @@ pub fn is_rejected(candidate: &str) -> bool {
 fn is_word_bounded(line: &str, start: usize, end: usize) -> bool {
     let before = line[..start].chars().next_back();
     let after = line[end..].chars().next();
-    !before.is_some_and(|c| HASH_CHARS.contains(c)) && !after.is_some_and(|c| HASH_CHARS.contains(c))
+    !before.is_some_and(|c| HASH_CHARS.contains(c))
+        && !after.is_some_and(|c| HASH_CHARS.contains(c))
 }
 
 fn push_unique(found: &mut Vec<String>, candidate: &str) {
@@ -199,7 +200,10 @@ mod tests {
     #[test]
     fn a_bare_hash_is_only_taken_when_it_stands_alone() {
         let glued = format!("passd(card): blob AAAA{REAL}BBBB done");
-        assert!(hashes_in(&glued).is_empty(), "a hash inside a longer token is not a hash");
+        assert!(
+            hashes_in(&glued).is_empty(),
+            "a hash inside a longer token is not a hash"
+        );
 
         let alone = format!("passd(card): opened {REAL} ok");
         assert_eq!(hashes_in(&alone), vec![REAL.to_owned()]);

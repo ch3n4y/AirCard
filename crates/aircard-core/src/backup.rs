@@ -28,7 +28,9 @@ pub enum SaveError {
 
 /// A backup directory counts only when the whole set is in it.
 pub fn is_complete(dir: &Path) -> bool {
-    BACKED_UP_ASSETS.iter().all(|name| file_non_empty(&dir.join(name)))
+    BACKED_UP_ASSETS
+        .iter()
+        .all(|name| file_non_empty(&dir.join(name)))
 }
 
 fn discard_dir(dir: &Path) {
@@ -228,7 +230,10 @@ mod tests {
         let dir = store.dir(UDID, CARD);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join(BACKED_UP_ASSETS[0]), b"half").unwrap();
-        assert!(!store.contains(UDID, CARD), "a partial set must not look restorable");
+        assert!(
+            !store.contains(UDID, CARD),
+            "a partial set must not look restorable"
+        );
 
         let mut partial = full_set();
         partial.pop();
@@ -274,7 +279,11 @@ mod tests {
             .filter_map(Result::ok)
             .map(|entry| entry.file_name().to_string_lossy().into_owned())
             .collect();
-        assert_eq!(names.len(), BACKED_UP_ASSETS.len(), "unexpected leftovers: {names:?}");
+        assert_eq!(
+            names.len(),
+            BACKED_UP_ASSETS.len(),
+            "unexpected leftovers: {names:?}"
+        );
     }
 
     #[test]
