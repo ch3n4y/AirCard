@@ -15,6 +15,7 @@
 //!    even when it is interrupted. The ported implementation leaked staging
 //!    directories on the phone when a run was cut short.
 
+pub mod airlift;
 pub mod hash;
 
 pub use hash::{hashes_in, is_rejected, is_wallet_line, PLACEHOLDER_HASHES};

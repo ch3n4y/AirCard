@@ -10,3 +10,12 @@ repository.workspace = true
 regex = "1"
 thiserror.workspace = true
 aircard-apple-ffi = { path = "../aircard-apple-ffi" }
+aircard-core = { path = "../aircard-core" }
+plist = "1"
+crc32fast = "1"
+getrandom = "0.3"
+
+# The fake phone in `airlift::phone` unpacks the archives the payload module
+# builds with a real unzip, which is the only way to test that the two agree.
+[dev-dependencies]
+zip = "2"
