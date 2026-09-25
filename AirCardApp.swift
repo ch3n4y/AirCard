@@ -32,6 +32,11 @@ struct DeviceInfo: Codable {
     var error: String?
 }
 
+struct SavedCardsResponse: Codable {
+    var ok: Bool
+    var cards: [String]?
+}
+
 struct DeviceListResponse: Codable {
     var connected: Bool
     var devices: [DeviceInfo]?
@@ -574,6 +579,8 @@ class AppViewModel: ObservableObject {
     
     @Published var device: DeviceInfo?
     @Published var devices: [DeviceInfo] = []
+    // Cards whose original artwork is saved on this Mac, so restore is real.
+    @Published var backedUpCards: Set<String> = []
     @Published var isCheckingDevice = false
     @Published var isScanningCards = false
     @Published var cards: [CardItem] = []
@@ -937,8 +944,10 @@ class AppViewModel: ObservableObject {
                     self.statusText = String(format: L("status.connected_to", "Connected to %@"), dev.name ?? "iPhone")
                     self.log("Device \(isInitial ? "connected" : "selected"): \(dev.name ?? "iPhone") (\(dev.product ?? ""), iOS \(dev.version ?? ""))")
                     self.applyDevicePreferences(from: dev)
+                    self.loadBackups()
                 } else {
                     self.device = nil
+                    self.backedUpCards = []
                     if isInitial {
                         self.statusText = L("status.no_iphone_found_please_connect", "No iPhone found. Please connect via USB.")
                     } else {
@@ -950,6 +959,93 @@ class AppViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Original Artwork
+
+    // Which cards can actually be put back. Asked per device, since a backup
+    // taken from one iPhone says nothing about another.
+    func loadBackups() {
+        guard let udid = device?.udid else {
+            backedUpCards = []
+            return
+        }
+        let scriptDir = self.scriptDir
+        Task.detached {
+            let data = AppViewModel.runBackend(["aircard_backend.py", "--backups", udid], scriptDir: scriptDir)
+            let list = data.flatMap { try? JSONDecoder().decode(SavedCardsResponse.self, from: $0) }
+            await MainActor.run {
+                self.backedUpCards = Set(list?.cards ?? [])
+            }
+        }
+    }
+
+    // Reading artwork back off the phone moves it and writes it out again, so
+    // this is something the user asks for rather than something a flash does
+    // quietly on their behalf.
+    func backupCard(id: String) {
+        guard let udid = device?.udid, !isFlashing else { return }
+        // Clear last time's error, or it outlives the run that caused it.
+        errorMessage = nil
+        isFlashing = true
+        showLogs = true
+        statusText = L("status.backing_up", "Saving original artwork...")
+        let scriptDir = self.scriptDir
+        Task.detached {
+            let data = AppViewModel.runBackend(["aircard_backend.py", "--backup", udid, id], scriptDir: scriptDir)
+            let text = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            await MainActor.run {
+                self.isFlashing = false
+                for line in text.split(separator: "\n") {
+                    guard let d = line.data(using: .utf8),
+                          let json = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                          let msg = json["message"] as? String else { continue }
+                    self.log("  \(msg)")
+                    if (json["type"] as? String) == "success" {
+                        self.statusText = L("status.backup_saved", "Original artwork saved")
+                    } else if (json["type"] as? String) == "error" {
+                        self.errorMessage = msg
+                        self.statusText = L("status.backup_failed", "Could not save the original artwork")
+                    }
+                }
+                self.loadBackups()
+            }
+        }
+    }
+
+    func restoreCard(id: String) {
+        guard let udid = device?.udid, !isFlashing else { return }
+        guard backedUpCards.contains(id) else {
+            errorMessage = L("error.no_backup_for_card", "There is no saved original for this card, so it cannot be restored.")
+            return
+        }
+        errorMessage = nil
+        isFlashing = true
+        showLogs = true
+        statusText = L("status.restoring", "Restoring original artwork...")
+        let scriptDir = self.scriptDir
+        Task.detached {
+            let data = AppViewModel.runBackend(["aircard_backend.py", "--restore", udid, id], scriptDir: scriptDir)
+            let text = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            await MainActor.run {
+                self.isFlashing = false
+                var restored = false
+                for line in text.split(separator: "\n") {
+                    guard let d = line.data(using: .utf8),
+                          let json = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                          let msg = json["message"] as? String else { continue }
+                    self.log("  \(msg)")
+                    if (json["type"] as? String) == "success" { restored = true }
+                    if (json["type"] as? String) == "error" { self.errorMessage = msg }
+                }
+                if restored {
+                    self.statusText = L("status.restored", "Card restored. Force-close Wallet to see it.")
+                    self.clearCardImage(for: id)
+                } else {
+                    self.statusText = L("status.restore_failed", "Could not restore the card")
+                }
+            }
+        }
+    }
+
     func applyDevicePreferences(from dev: DeviceInfo) {
         // 1. Auto-detect TelephonyUI version based on iOS major version
         if let verStr = dev.version, let major = Int(verStr.components(separatedBy: ".").first ?? "") {
@@ -1163,6 +1259,7 @@ class AppViewModel: ObservableObject {
         isFlashing = true
         showLogs = true
         progress = 0.0
+        errorMessage = nil
         if changed.isEmpty {
             log("No changed skins; re-flashing all \(allSkinned.count) selected card(s)...")
         } else {
@@ -1403,6 +1500,7 @@ class AppViewModel: ObservableObject {
         isFlashing = true
         showLogs = true
         progress = 0.0
+        errorMessage = nil
         statusText = L("status.starting_passcode_theme_flash", "Starting passcode theme flash...")
         log("Flashing passcode theme '\(theme.name)' to device...")
         let scriptDir = self.scriptDir
@@ -1657,8 +1755,12 @@ struct WalletCardView: View {
     @Binding var card: CardItem
     let cardIndex: Int
     var isFlashed: Bool = false
+    let hasBackup: Bool
+    let busy: Bool
     let onPickImage: () -> Void
     let onClearImage: () -> Void
+    let onBackup: () -> Void
+    let onRestore: () -> Void
     let onDelete: () -> Void
     
     @State private var isHovered = false
@@ -1868,6 +1970,35 @@ struct WalletCardView: View {
                         .help(isFlashed ? L("ui.skin_already_on_iphone", "Skin already on iPhone") : L("ui.skin_changed_will_be_flashed", "Skin changed, will be flashed"))
                 }
                 
+                Menu {
+                    Button(action: onBackup) {
+                        Label(L("ui.save_original", "Save Original Artwork"),
+                              systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(hasBackup || busy)
+
+                    Button(action: onRestore) {
+                        Label(L("ui.restore_original", "Restore Original Artwork"),
+                              systemImage: "arrow.uturn.backward")
+                    }
+                    .disabled(!hasBackup || busy)
+
+                    if hasBackup {
+                        Divider()
+                        Text(L("ui.original_saved", "Original artwork is saved"))
+                    }
+                } label: {
+                    Image(systemName: hasBackup ? "clock.arrow.circlepath" : "ellipsis.circle")
+                        .font(.system(size: 11))
+                        .foregroundColor(hasBackup ? .accentColor : .secondary.opacity(0.7))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help(hasBackup
+                      ? L("ui.original_saved", "Original artwork is saved")
+                      : L("ui.save_original_help", "Save this card's original artwork so it can be put back"))
+
                 // Delete button
                 Button(action: onDelete) {
                     Image(systemName: "trash")
@@ -1954,8 +2085,12 @@ struct ContentView: View {
                                     card: $vm.cards[idx],
                                     cardIndex: idx,
                                     isFlashed: vm.isSkinFlashed(vm.cards[idx]),
+                                    hasBackup: vm.backedUpCards.contains(vm.cards[idx].id),
+                                    busy: vm.isFlashing,
                                     onPickImage: { openCardImagePicker(for: vm.cards[idx].id) },
                                     onClearImage: { vm.clearCardImage(for: vm.cards[idx].id) },
+                                    onBackup: { vm.backupCard(id: vm.cards[idx].id) },
+                                    onRestore: { vm.restoreCard(id: vm.cards[idx].id) },
                                     onDelete: { vm.deleteCard(id: vm.cards[idx].id) }
                                 )
                             }

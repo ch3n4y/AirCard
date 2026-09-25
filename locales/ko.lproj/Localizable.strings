@@ -10,6 +10,7 @@
 "error.could_not_run_device_tools" = "AirCard가 기기 도구를 실행하지 못했습니다. 앱이 손상되었거나 불완전하게 설치되었을 수 있습니다.";
 "error.failed_to_inspect_passthm_file" = ".passthm 파일을 확인하지 못했습니다";
 "error.failed_to_package_theme_for" = "적용할 테마를 준비하지 못했습니다.";
+"error.no_backup_for_card" = "이 카드는 저장된 원본이 없어 복원할 수 없습니다.";
 "error.no_iphone_connected" = "연결된 iPhone이 없습니다.";
 "error.one_or_more_cards_could" = "일부 카드를 업데이트하지 못했습니다. 로그를 확인한 후 다시 시도하십시오.";
 "error.please_add_at_least_one" = "먼저 키 아이콘을 하나 이상 추가하거나 포스터 이미지를 가져오십시오.";
@@ -33,6 +34,9 @@
 "panel.export_prompt" = "내보내기";
 "panel.save_theme_title" = "암호 테마 저장";
 "status.adopted_poster_slices_to_individual" = "포스터 조각을 개별 키로 가져왔습니다";
+"status.backing_up" = "원본 아트워크 저장 중...";
+"status.backup_failed" = "원본 아트워크를 저장하지 못했습니다";
+"status.backup_saved" = "원본 아트워크를 저장했습니다";
 "status.card_scanning_ended_check_the" = "카드 스캔이 종료되었습니다. 로그를 확인하고 iPhone을 다시 연결하십시오.";
 "status.card_scanning_failed_check_the" = "카드 스캔에 실패했습니다. 로그를 확인한 후 다시 시도하십시오.";
 "status.checking_connected_devices" = "연결된 기기 확인 중...";
@@ -52,6 +56,9 @@
 "status.poster_image_loaded_ready_to" = "포스터 이미지 불러옴 · 구도 조정 및 분할 준비 완료";
 "status.preparing_skin" = "[%1$d/%2$d] %3$@ 스킨 준비 중...";
 "status.ready" = "준비됨";
+"status.restore_failed" = "카드를 복원하지 못했습니다";
+"status.restored" = "카드를 복원했습니다 · 지갑 앱을 강제 종료하면 원래 디자인이 나타납니다";
+"status.restoring" = "원본 아트워크 복원 중...";
 "status.selected_iphone_is_no_longer" = "선택한 iPhone의 연결이 끊어졌습니다.";
 "status.starting_passcode_theme_flash" = "암호 테마 적용을 시작합니다...";
 "status.step_message" = "[%1$d/%2$d] %3$@";
@@ -143,6 +150,7 @@
 "ui.no_passthm_loaded_select_a" = ".passthm 없음 · 적용할 테마 패키지를 선택하십시오";
 "ui.ok" = "확인";
 "ui.on_your_iphone_double_click" = "iPhone에서 **측면 버튼을 두 번 누르고**(Apple Pay) **Face ID**로 인증한 다음 **카드를 탭**하십시오.";
+"ui.original_saved" = "원본 아트워크 저장됨";
 "ui.passcode_theme_file" = "암호 테마 파일";
 "ui.passcode_theme_successfully_applied_n" = "암호 테마를 적용했습니다!\\\\n\\\\niPhone을 잠갔다 켜거나 재시동하면 새 암호 키패드가 나타납니다.";
 "ui.passcode_themes" = "암호 테마:";
@@ -159,6 +167,9 @@
 "ui.reset_position" = "위치 재설정";
 "ui.reset_position_zoom" = "위치 및 확대/축소 재설정";
 "ui.reset_to_iphone_s_detected" = "iPhone에서 감지한 언어와 서체로 재설정";
+"ui.restore_original" = "원본 아트워크 복원";
+"ui.save_original" = "원본 아트워크 저장";
+"ui.save_original_help" = "나중에 되돌릴 수 있도록 이 카드의 원본 아트워크를 저장합니다.";
 "ui.scan_cards" = "카드 스캔";
 "ui.seamless_poster" = "끊김 없는 포스터";
 "ui.select_all" = "모두 선택";

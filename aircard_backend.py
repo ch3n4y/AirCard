@@ -43,6 +43,7 @@ for lp in lib_paths:
 from apply_card_skin import (
     native,
     operation_ok,
+    read_file,
     write_file,
     write_files_batch,
     remove_files,
@@ -54,9 +55,15 @@ from card_assets import CACHE_FILES, build_card_assets
 from aircard import (
     find_device_helper,
     get_connected_device,
+    has_card_backup,
+    list_backed_up_cards,
+    BACKED_UP_ASSETS,
     list_connected_devices,
     load_saved_cards,
+    read_card_backup,
+    save_card_backup,
     save_cards,
+    TARGET_ASSETS,
 )
 
 
@@ -86,6 +93,125 @@ def cmd_devices():
         return
     devices = list_connected_devices()
     print(json.dumps({"connected": bool(devices), "devices": devices}))
+
+
+def cmd_backup(udid: str, card_hash: str) -> bool:
+    """Saves a card's current artwork so it can be put back later.
+
+    Deliberately a separate step rather than something the flash does on its
+    own: reading a file back off the device moves it and writes it out again,
+    and that is not a risk to take on someone's card unless they asked for it.
+    Taken once per card, so a later flash cannot overwrite the original with a
+    skin that was applied in between.
+    """
+    if has_card_backup(udid, card_hash):
+        print(json.dumps({
+            "type": "success", "card": card_hash, "code": "backup.exists",
+            "message": f"Original artwork for {card_hash[:12]}... is already saved"
+        }))
+        sys.stdout.flush()
+        return True
+
+    pkpass_dir = f"/var/mobile/Library/Passes/Cards/{card_hash}.pkpass"
+    originals = []
+    for asset in BACKED_UP_ASSETS:
+        try:
+            data = read_file(udid, pkpass_dir, asset)
+        except Exception:
+            data = None
+        if data:
+            originals.append((asset, data))
+
+    if not save_card_backup(udid, card_hash, originals):
+        print(json.dumps({
+            "type": "error", "card": card_hash, "code": "backup.failed",
+            "message": f"Could not read the original artwork for {card_hash[:12]}..."
+        }))
+        sys.stdout.flush()
+        return False
+
+    print(json.dumps({
+        "type": "success", "card": card_hash, "code": "backup.done",
+        "message": f"Saved original artwork for {card_hash[:12]}..."
+    }))
+    sys.stdout.flush()
+    return True
+
+
+def cmd_restore(udid: str, card_hash: str) -> bool:
+    """Puts a card's original artwork back and clears the rendered faces."""
+    originals = read_card_backup(udid, card_hash)
+    if not originals:
+        print(json.dumps({
+            "type": "error",
+            "card": card_hash,
+            "code": "restore.no_backup",
+            "message": "No original artwork was saved for this card, so it cannot be restored."
+        }))
+        sys.stdout.flush()
+        return False
+
+    pkpass_dir = f"/var/mobile/Library/Passes/Cards/{card_hash}.pkpass"
+    total_steps = 2
+    all_ok = True
+
+    print(json.dumps({
+        "type": "progress", "card": card_hash, "step": 1, "total": total_steps,
+        "code": "restore.writing",
+        "message": f"Restoring {len(originals)} original artwork files..."
+    }))
+    sys.stdout.flush()
+
+    try:
+        ok = write_files_batch(udid, pkpass_dir, originals)
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        ok = False
+    if not ok:
+        for asset, payload in originals:
+            try:
+                ok_single = write_file(udid, pkpass_dir, asset, payload)
+            except Exception:
+                ok_single = False
+            if not ok_single:
+                all_ok = False
+
+    # Same cache clearing the flash does, or Wallet keeps showing the skin.
+    print(json.dumps({
+        "type": "progress", "card": card_hash, "step": 2, "total": total_steps,
+        "code": "restore.clearing_cache",
+        "message": "Clearing rendered card faces..."
+    }))
+    sys.stdout.flush()
+    for ext in [".cache", ".pkcache"]:
+        cache_dir = f"/var/mobile/Library/Passes/Cards/{card_hash}{ext}"
+        try:
+            ok_cache = remove_files(udid, cache_dir, list(CACHE_FILES))
+        except Exception:
+            ok_cache = False
+        if not ok_cache:
+            all_ok = False
+
+    if not all_ok:
+        print(json.dumps({
+            "type": "error", "card": card_hash, "step": 2, "total": total_steps,
+            "code": "restore.failed",
+            "message": f"Could not fully restore {card_hash[:12]}..."
+        }))
+        sys.stdout.flush()
+        return False
+
+    print(json.dumps({
+        "type": "success", "card": card_hash, "step": 2, "total": total_steps,
+        "code": "restore.done",
+        "message": f"Restored {card_hash[:12]}... to its original artwork"
+    }))
+    sys.stdout.flush()
+    return True
+
+
+def cmd_backups(udid: str):
+    """Which cards on this device still have their original artwork saved."""
+    print(json.dumps({"ok": True, "cards": list_backed_up_cards(udid)}))
 
 
 def cmd_get_saved_cards():
@@ -588,6 +714,14 @@ def main():
         cmd_devices()
     elif norm_cmd == "cards":
         cmd_get_saved_cards()
+    elif norm_cmd == "backups" and len(sys.argv) > 2:
+        cmd_backups(sys.argv[2])
+    elif norm_cmd == "backup" and len(sys.argv) > 3:
+        if not cmd_backup(sys.argv[2], sys.argv[3]):
+            sys.exit(1)
+    elif norm_cmd == "restore" and len(sys.argv) > 3:
+        if not cmd_restore(sys.argv[2], sys.argv[3]):
+            sys.exit(1)
     elif norm_cmd == "save-cards" and len(sys.argv) > 2:
         cmd_save_cards(sys.argv[2])
     elif norm_cmd == "prepare-image" and len(sys.argv) > 3:

@@ -10,6 +10,7 @@
 "error.could_not_run_device_tools" = "AirCard n'a pas pu exécuter ses outils pour appareils. L'app est peut-être endommagée ou installée de façon incomplète.";
 "error.failed_to_inspect_passthm_file" = "Impossible de lire le fichier .passthm";
 "error.failed_to_package_theme_for" = "Impossible de préparer le thème pour l'installation.";
+"error.no_backup_for_card" = "Aucune illustration d'origine enregistrée pour cette carte : restauration impossible.";
 "error.no_iphone_connected" = "Aucun iPhone connecté.";
 "error.one_or_more_cards_could" = "Certaines cartes n'ont pas pu être mises à jour. Consultez le journal, puis réessayez.";
 "error.please_add_at_least_one" = "Ajoutez d'abord une icône de touche ou importez une affiche.";
@@ -33,6 +34,9 @@
 "panel.export_prompt" = "Exporter";
 "panel.save_theme_title" = "Enregistrer le thème de code";
 "status.adopted_poster_slices_to_individual" = "Découpes de l'affiche appliquées aux touches";
+"status.backing_up" = "Enregistrement de l'illustration d'origine…";
+"status.backup_failed" = "Impossible d'enregistrer l'illustration d'origine";
+"status.backup_saved" = "Illustration d'origine enregistrée";
 "status.card_scanning_ended_check_the" = "Recherche de cartes interrompue. Consultez le journal et reconnectez l'iPhone pour réessayer.";
 "status.card_scanning_failed_check_the" = "Échec de la recherche de cartes. Consultez le journal, puis réessayez.";
 "status.checking_connected_devices" = "Vérification des appareils connectés…";
@@ -52,6 +56,9 @@
 "status.poster_image_loaded_ready_to" = "Affiche chargée · Prête à cadrer et à découper";
 "status.preparing_skin" = "[%1$d/%2$d] Préparation de l'habillage de %3$@…";
 "status.ready" = "Prêt";
+"status.restore_failed" = "Impossible de restaurer la carte";
+"status.restored" = "Carte restaurée. Forcez la fermeture de Wallet pour la voir.";
+"status.restoring" = "Restauration de l'illustration d'origine…";
 "status.selected_iphone_is_no_longer" = "L'iPhone sélectionné n'est plus connecté.";
 "status.starting_passcode_theme_flash" = "Installation du thème de code…";
 "status.step_message" = "[%1$d/%2$d] %3$@";
@@ -143,6 +150,7 @@
 "ui.no_passthm_loaded_select_a" = "Aucun .passthm chargé · Sélectionnez un thème à installer";
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "Sur votre iPhone, **double-cliquez sur le bouton latéral** (Apple Pay), validez avec **Face ID**, puis **touchez votre carte**.";
+"ui.original_saved" = "Illustration d'origine enregistrée";
 "ui.passcode_theme_file" = "Fichier de thème de code";
 "ui.passcode_theme_successfully_applied_n" = "Thème de code appliqué !\\\\n\\\\nVerrouillez votre iPhone (ou redémarrez-le) pour découvrir votre nouveau clavier.";
 "ui.passcode_themes" = "Thèmes de code :";
@@ -159,6 +167,9 @@
 "ui.reset_position" = "Réinitialiser la position";
 "ui.reset_position_zoom" = "Réinitialiser la position et le zoom";
 "ui.reset_to_iphone_s_detected" = "Revenir à la langue et au style détectés sur l'iPhone";
+"ui.restore_original" = "Restaurer l'illustration d'origine";
+"ui.save_original" = "Enregistrer l'illustration d'origine";
+"ui.save_original_help" = "Enregistrer l'illustration d'origine de cette carte pour pouvoir la restaurer";
 "ui.scan_cards" = "Rechercher les cartes";
 "ui.seamless_poster" = "Affiche continue";
 "ui.select_all" = "Tout sélectionner";

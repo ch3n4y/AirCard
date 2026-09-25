@@ -38,12 +38,17 @@ from apply_card_skin import (
     ROOT,
     DEVICE_HELPER,
 )
-from card_assets import CACHE_FILES
+from card_assets import CACHE_FILES, PDF_ASSET_NAME, PNG_ASSET_NAMES
 
 TARGET_ASSETS = [
     "cardBackgroundCombined@3x.png",
     "cardBackgroundCombined@2x.png",
 ]
+
+# Everything a flash overwrites, which is what a backup has to cover. Taken from
+# card_assets so the two cannot drift apart: leaving the PDF behind would put the
+# skin straight back on a card the user just restored.
+BACKED_UP_ASSETS = [*PNG_ASSET_NAMES, PDF_ASSET_NAME]
 
 CARDS_STORE_PATH = Path.home() / ".aircard_cards.json"
 LEGACY_STORE_PATH = Path.home() / ".lumicards_cards.json"
@@ -76,6 +81,83 @@ def save_cards(cards: list[str]):
         CARDS_STORE_PATH.write_text(json.dumps(unique, indent=2), encoding="utf-8")
     except Exception:
         pass
+
+
+# Original artwork is kept per device, so restoring one iPhone never reaches for
+# a backup taken from another.
+BACKUPS_ROOT = Path.home() / ".aircard_backups"
+
+
+def _backup_slug(card_hash: str) -> str:
+    """Card hashes contain / and +, neither of which survives as a folder name."""
+    from urllib.parse import quote
+    return quote(card_hash, safe="")
+
+
+def card_backup_dir(udid: str, card_hash: str) -> Path:
+    return BACKUPS_ROOT / _backup_slug(udid) / _backup_slug(card_hash)
+
+
+def has_card_backup(udid: str, card_hash: str) -> bool:
+    """True only when the original artwork is actually sitting on disk.
+
+    The app asks this before offering to restore, so a card whose backup never
+    got taken is never offered a restore it cannot deliver.
+    """
+    d = card_backup_dir(udid, card_hash)
+    return d.is_dir() and any(f.is_file() and f.stat().st_size > 0 for f in d.iterdir())
+
+
+def save_card_backup(udid: str, card_hash: str, assets: list[tuple[str, bytes]]) -> bool:
+    """Stores the original artwork, once. Later flashes must not overwrite it.
+
+    Returns False if nothing usable was stored, so the caller can record that
+    this card has no way back rather than implying it does.
+    """
+    usable = [(name, data) for name, data in assets if data]
+    if not usable:
+        return False
+    d = card_backup_dir(udid, card_hash)
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        for name, data in usable:
+            (d / name).write_bytes(data)
+    except OSError:
+        return False
+    return True
+
+
+def read_card_backup(udid: str, card_hash: str) -> list[tuple[str, bytes]]:
+    d = card_backup_dir(udid, card_hash)
+    if not d.is_dir():
+        return []
+    out = []
+    for f in sorted(d.iterdir()):
+        if not f.is_file():
+            continue
+        try:
+            data = f.read_bytes()
+        except OSError:
+            continue
+        if data:
+            out.append((f.name, data))
+    return out
+
+
+def list_backed_up_cards(udid: str) -> list[str]:
+    """Card hashes on this device that can be restored."""
+    from urllib.parse import unquote
+    root = BACKUPS_ROOT / _backup_slug(udid)
+    if not root.is_dir():
+        return []
+    found = []
+    for d in root.iterdir():
+        if not d.is_dir():
+            continue
+        card = unquote(d.name)
+        if has_card_backup(udid, card):
+            found.append(card)
+    return sorted(found)
 
 
 def find_device_helper() -> str | None:

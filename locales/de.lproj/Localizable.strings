@@ -10,6 +10,7 @@
 "error.could_not_run_device_tools" = "AirCard konnte die Gerätewerkzeuge nicht ausführen. Die App ist möglicherweise beschädigt oder unvollständig installiert.";
 "error.failed_to_inspect_passthm_file" = ".passthm-Datei konnte nicht gelesen werden";
 "error.failed_to_package_theme_for" = "Design konnte nicht zum Aufspielen gepackt werden.";
+"error.no_backup_for_card" = "Für diese Karte ist keine Originalgrafik gesichert. Sie kann nicht wiederhergestellt werden.";
 "error.no_iphone_connected" = "Kein iPhone verbunden.";
 "error.one_or_more_cards_could" = "Mindestens eine Karte konnte nicht aktualisiert werden. Prüfe das Protokoll und versuche es erneut.";
 "error.please_add_at_least_one" = "Füge zuerst mindestens ein Tastensymbol hinzu oder importiere ein Posterbild.";
@@ -33,6 +34,9 @@
 "panel.export_prompt" = "Exportieren";
 "panel.save_theme_title" = "Code-Design sichern";
 "status.adopted_poster_slices_to_individual" = "Posterteile für einzelne Tasten übernommen";
+"status.backing_up" = "Originalgrafik wird gesichert …";
+"status.backup_failed" = "Originalgrafik konnte nicht gesichert werden";
+"status.backup_saved" = "Originalgrafik gesichert";
 "status.card_scanning_ended_check_the" = "Kartenscan beendet. Prüfe das Protokoll und verbinde das iPhone neu, um es erneut zu versuchen.";
 "status.card_scanning_failed_check_the" = "Kartenscan fehlgeschlagen. Prüfe das Protokoll und versuche es erneut.";
 "status.checking_connected_devices" = "Verbundene Geräte werden geprüft …";
@@ -52,6 +56,9 @@
 "status.poster_image_loaded_ready_to" = "Posterbild geladen · Bereit zum Ausrichten und Zerlegen";
 "status.preparing_skin" = "[%1$d/%2$d] Skin für %3$@ wird vorbereitet …";
 "status.ready" = "Bereit";
+"status.restore_failed" = "Karte konnte nicht wiederhergestellt werden";
+"status.restored" = "Karte wiederhergestellt. Beende die Wallet-App vollständig, um die Karte zu sehen.";
+"status.restoring" = "Originalgrafik wird wiederhergestellt …";
 "status.selected_iphone_is_no_longer" = "Das ausgewählte iPhone ist nicht mehr verbunden.";
 "status.starting_passcode_theme_flash" = "Aufspielen des Code-Designs wird gestartet …";
 "status.step_message" = "[%1$d/%2$d] %3$@";
@@ -143,6 +150,7 @@
 "ui.no_passthm_loaded_select_a" = "Keine .passthm geladen · Wähle ein Design-Paket zum Aufspielen";
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "Drücke auf deinem iPhone **zweimal die Seitentaste** (Apple Pay), bestätige mit **Face ID** und **tippe auf deine Karte**.";
+"ui.original_saved" = "Originalgrafik ist gesichert";
 "ui.passcode_theme_file" = "Code-Design-Datei";
 "ui.passcode_theme_successfully_applied_n" = "Code-Design erfolgreich angewendet!\\n\\nSperre dein iPhone (oder starte es neu), um das neue Code-Tastenfeld zu sehen.";
 "ui.passcode_themes" = "Code-Designs:";
@@ -159,6 +167,9 @@
 "ui.reset_position" = "Position zurücksetzen";
 "ui.reset_position_zoom" = "Position & Zoom zurücksetzen";
 "ui.reset_to_iphone_s_detected" = "Auf erkannte Sprache und Schriftstil des iPhone zurücksetzen";
+"ui.restore_original" = "Originalgrafik wiederherstellen";
+"ui.save_original" = "Originalgrafik sichern";
+"ui.save_original_help" = "Originalgrafik dieser Karte sichern, um sie später wiederherzustellen";
 "ui.scan_cards" = "Karten scannen";
 "ui.seamless_poster" = "Nahtloses Poster";
 "ui.select_all" = "Alle auswählen";

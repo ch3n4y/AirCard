@@ -10,6 +10,7 @@
 "error.could_not_run_device_tools" = "AirCard не удалось запустить инструменты для работы с устройством. Возможно, приложение повреждено или установлено не полностью.";
 "error.failed_to_inspect_passthm_file" = "Не удалось прочитать файл .passthm";
 "error.failed_to_package_theme_for" = "Не удалось собрать тему для прошивки.";
+"error.no_backup_for_card" = "Исходное изображение этой карты не сохранено — восстановить её нельзя.";
 "error.no_iphone_connected" = "iPhone не подключён.";
 "error.one_or_more_cards_could" = "Не удалось обновить одну или несколько карт. Посмотрите журнал и повторите попытку.";
 "error.please_add_at_least_one" = "Сначала добавьте хотя бы один значок клавиши или загрузите постер.";
@@ -33,6 +34,9 @@
 "panel.export_prompt" = "Экспортировать";
 "panel.save_theme_title" = "Сохранить тему код-пароля";
 "status.adopted_poster_slices_to_individual" = "Фрагменты постера перенесены на отдельные клавиши";
+"status.backing_up" = "Сохранение исходного изображения…";
+"status.backup_failed" = "Не удалось сохранить исходное изображение";
+"status.backup_saved" = "Исходное изображение сохранено";
 "status.card_scanning_ended_check_the" = "Сканирование карт прервано. Посмотрите журнал, переподключите iPhone и повторите.";
 "status.card_scanning_failed_check_the" = "Не удалось отсканировать карты. Посмотрите журнал и повторите.";
 "status.checking_connected_devices" = "Проверка подключённых устройств…";
@@ -52,6 +56,9 @@
 "status.poster_image_loaded_ready_to" = "Постер загружен · Можно кадрировать и нарезать";
 "status.preparing_skin" = "[%1$d/%2$d] Подготовка обложки для %3$@…";
 "status.ready" = "Готово";
+"status.restore_failed" = "Не удалось восстановить карту";
+"status.restored" = "Карта восстановлена. Принудительно завершите Wallet, чтобы увидеть изменения.";
+"status.restoring" = "Восстановление исходного изображения…";
 "status.selected_iphone_is_no_longer" = "Выбранный iPhone больше не подключён.";
 "status.starting_passcode_theme_flash" = "Начинается прошивка темы код-пароля…";
 "status.step_message" = "[%1$d/%2$d] %3$@";
@@ -143,6 +150,7 @@
 "ui.no_passthm_loaded_select_a" = "Файл .passthm не выбран · Выберите пакет темы для прошивки";
 "ui.ok" = "ОК";
 "ui.on_your_iphone_double_click" = "На iPhone **дважды нажмите боковую кнопку** (Apple Pay), пройдите проверку **Face ID** и **коснитесь карты**.";
+"ui.original_saved" = "Исходное изображение сохранено";
 "ui.passcode_theme_file" = "Файл темы код-пароля";
 "ui.passcode_theme_successfully_applied_n" = "Тема код-пароля применена!\\\\n\\\\nЗаблокируйте iPhone (или перезагрузите его), чтобы увидеть новую клавиатуру код-пароля.";
 "ui.passcode_themes" = "Темы код-пароля:";
@@ -159,6 +167,9 @@
 "ui.reset_position" = "Сбросить положение";
 "ui.reset_position_zoom" = "Сбросить положение и масштаб";
 "ui.reset_to_iphone_s_detected" = "Вернуть язык и начертание, определённые на iPhone";
+"ui.restore_original" = "Восстановить исходное изображение";
+"ui.save_original" = "Сохранить исходное изображение";
+"ui.save_original_help" = "Сохранить исходное изображение карты, чтобы потом его вернуть";
 "ui.scan_cards" = "Сканировать карты";
 "ui.seamless_poster" = "Цельный постер";
 "ui.select_all" = "Выбрать все";

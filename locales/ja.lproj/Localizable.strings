@@ -10,6 +10,7 @@
 "error.could_not_run_device_tools" = "AirCard はデバイスツールを実行できませんでした。アプリが破損しているか、不完全にインストールされている可能性があります。";
 "error.failed_to_inspect_passthm_file" = ".passthmファイルの内容を確認できませんでした";
 "error.failed_to_package_theme_for" = "書き込み用のテーマを作成できませんでした。";
+"error.no_backup_for_card" = "このカードの元のアートワークが保存されていないため、復元できません。";
 "error.no_iphone_connected" = "iPhoneが接続されていません。";
 "error.one_or_more_cards_could" = "更新できなかったカードがあります。ログを確認してやり直してください。";
 "error.please_add_at_least_one" = "先にキーのアイコンを1つ以上追加するか、ポスター画像を読み込んでください。";
@@ -33,6 +34,9 @@
 "panel.export_prompt" = "書き出す";
 "panel.save_theme_title" = "パスコードテーマを保存";
 "status.adopted_poster_slices_to_individual" = "ポスターの分割画像を各キーに取り込みました";
+"status.backing_up" = "元のアートワークを保存しています...";
+"status.backup_failed" = "元のアートワークを保存できませんでした";
+"status.backup_saved" = "元のアートワークを保存しました";
 "status.card_scanning_ended_check_the" = "カードのスキャンが終了しました。ログを確認し、iPhoneを接続し直してやり直してください。";
 "status.card_scanning_failed_check_the" = "カードのスキャンに失敗しました。ログを確認してやり直してください。";
 "status.checking_connected_devices" = "接続中のデバイスを確認しています...";
@@ -52,6 +56,9 @@
 "status.poster_image_loaded_ready_to" = "ポスター画像を読み込みました・位置を調整して分割できます";
 "status.preparing_skin" = "[%1$d/%2$d] %3$@のスキンを準備しています...";
 "status.ready" = "準備完了";
+"status.restore_failed" = "カードを復元できませんでした";
+"status.restored" = "カードを復元しました。Walletアプリを強制終了すると反映されます。";
+"status.restoring" = "元のアートワークを復元しています...";
 "status.selected_iphone_is_no_longer" = "選択したiPhoneは接続されていません。";
 "status.starting_passcode_theme_flash" = "パスコードテーマの書き込みを開始しています...";
 "status.step_message" = "[%1$d/%2$d] %3$@";
@@ -143,6 +150,7 @@
 "ui.no_passthm_loaded_select_a" = ".passthm未読み込み・書き込むテーマパッケージを選択してください";
 "ui.ok" = "OK";
 "ui.on_your_iphone_double_click" = "iPhoneで**サイドボタンをダブルクリック**して（Apple Pay）、**Face ID**で認証し、**カードをタップ**します。";
+"ui.original_saved" = "元のアートワーク保存済み";
 "ui.passcode_theme_file" = "パスコードテーマファイル";
 "ui.passcode_theme_successfully_applied_n" = "パスコードテーマを適用しました！\\\\n\\\\niPhoneをロックする（または再起動する）と、新しいパスコードキーパッドが表示されます。";
 "ui.passcode_themes" = "パスコードテーマ：";
@@ -159,6 +167,9 @@
 "ui.reset_position" = "位置をリセット";
 "ui.reset_position_zoom" = "位置とズームをリセット";
 "ui.reset_to_iphone_s_detected" = "iPhoneで検出された言語とフォントスタイルに戻す";
+"ui.restore_original" = "元のアートワークを復元";
+"ui.save_original" = "元のアートワークを保存";
+"ui.save_original_help" = "このカードの元のアートワークを保存して、あとで復元できるようにします";
 "ui.scan_cards" = "カードをスキャン";
 "ui.seamless_poster" = "シームレスポスター";
 "ui.select_all" = "すべてを選択";
