@@ -1,160 +1,153 @@
-import { Alert, Button, Card, Empty, Flex, Tag, Typography } from "antd";
-import { PictureOutlined, ThunderboltOutlined } from "@ant-design/icons";
-
-import type { Card as CardInfo, FlashResult } from "../api";
+import { Alert, Button, Spin } from "antd";
+import {
+  CheckCircleFilled,
+  PictureOutlined,
+  ArrowRightOutlined,
+  SafetyCertificateOutlined,
+} from "@ant-design/icons";
+import type { Card, FlashResult } from "../api";
 import { t } from "../strings";
 import { shortHash } from "../ui";
 
 type Props = {
-  cards: CardInfo[];
+  cards: Card[];
   selected: string[];
   image: { path: string; preview: string } | null;
   results: FlashResult[] | null;
   busy: string | null;
+  connected: boolean;
+  imageLoading: boolean;
+  dropping: boolean;
   onPick: () => void;
   onFlash: () => void;
 };
 
-/**
- * 把一张图片刷到选中的卡片上。
- *
- * 刷入是唯一一件手机上也留不下退路的事，所以这里要说清两件：这张图会去哪里，以及
- * 哪些卡片还没有原图（后端会先自动存一份再刷）。
- */
+/** The image, target summary and action stay visible beside the selectable cards. */
 export function FlashPanel({
   cards,
   selected,
   image,
   results,
   busy,
+  connected,
+  imageLoading,
+  dropping,
   onPick,
   onFlash,
 }: Props) {
   const targets = cards.filter((card) => selected.includes(card.hash));
-  const unsaved = targets.filter((card) => !card.has_original).length;
-  const ready = image !== null && targets.length > 0 && busy === null;
+  const ready =
+    connected && image !== null && targets.length > 0 && !busy && !imageLoading;
+  const flashing = busy === t.flashingCards;
+  const hint = !connected
+    ? "请先连接 iPhone"
+    : !targets.length
+      ? "点击左侧卡片，选择刷入目标"
+      : !image
+        ? "选择一张新卡面"
+        : busy
+          ? busy
+          : "已准备好";
+  const succeeded = results?.filter((result) => result.ok).length ?? 0;
 
   return (
-    <Flex vertical gap={12}>
-      <Card
-        size="small"
-        title={t.pickedImage}
-        extra={
-          image && (
-            <Button size="small" disabled={busy !== null} onClick={onPick}>
-              {t.changeImage}
-            </Button>
-          )
+    <div className="flash-composer">
+      <div className="composer-heading">
+        <span className="step-dot">2</span>
+        <h2>新卡面</h2>
+      </div>
+      <button
+        type="button"
+        className={
+          "image-picker" +
+          (image ? " has-image" : "") +
+          (dropping ? " over" : "")
         }
+        onClick={onPick}
+        disabled={imageLoading || flashing}
+        aria-label={image ? "更换图片" : "选择图片"}
       >
         {image ? (
-          <Flex gap={12} align="flex-start">
-            <img
-              src={image.preview}
-              alt=""
-              style={{
-                width: 240,
-                borderRadius: 6,
-                border: "1px solid #e5e5e5",
-                background: "#f0f0f0",
-              }}
-            />
-            <Flex vertical gap={4} style={{ minWidth: 0 }}>
-              <Tag color="green">{t.imageReady}</Tag>
-              <Typography.Text type="secondary" className="hash">
-                {image.path}
-              </Typography.Text>
-            </Flex>
-          </Flex>
+          <img src={image.preview} alt="待刷入的卡面" />
         ) : (
-          <Flex vertical gap={12}>
-            <div className="drop-target">
-              <PictureOutlined style={{ fontSize: 24 }} />
-              <div style={{ marginTop: 8 }}>{t.dropImage}</div>
-            </div>
-            <Button
-              type="primary"
-              icon={<PictureOutlined />}
-              disabled={busy !== null}
-              onClick={onPick}
-            >
-              {t.chooseImage}
-            </Button>
-          </Flex>
+          <span className="image-picker-empty">
+            <span className="image-picker-icon">
+              <PictureOutlined />
+            </span>
+            <strong>选择图片</strong>
+            <span>或拖放到窗口</span>
+          </span>
         )}
-      </Card>
-
-      <Card size="small" title={t.targetCards}>
-        {targets.length === 0 ? (
-          <Empty description={t.needCards} image={Empty.PRESENTED_IMAGE_SIMPLE} />
-        ) : (
-          <Flex vertical gap={6}>
-            <Typography.Text>
-              {t.selectedCount(targets.length, cards.length)}
-            </Typography.Text>
-            <Flex gap={4} wrap>
-              {targets.map((card) => (
-                <Tag key={card.hash} className="hash-short">
-                  {shortHash(card.hash, 10)}
-                </Tag>
-              ))}
-            </Flex>
-            {unsaved > 0 && (
-              <Alert
-                type="warning"
-                showIcon
-                message={t.flashWillSaveFirst(unsaved)}
-              />
-            )}
-          </Flex>
+        {image && <span className="change-image">更换图片</span>}
+        {imageLoading && (
+          <span className="image-loading">
+            <Spin />
+          </span>
         )}
-      </Card>
-
-      <Flex gap={12} align="center" wrap>
-        <Button
-          type="primary"
-          size="large"
-          icon={<ThunderboltOutlined />}
-          disabled={!ready}
-          onClick={onFlash}
-        >
-          {t.flashSkins}
-        </Button>
-        {busy && <Typography.Text type="secondary">{busy}…</Typography.Text>}
-        {!image && <Typography.Text type="secondary">{t.needImage}</Typography.Text>}
-        {image && targets.length === 0 && (
-          <Typography.Text type="secondary">{t.needCards}</Typography.Text>
-        )}
-      </Flex>
-
-      {results && (
-        <Card size="small" title={t.flashResults}>
-          <Flex vertical gap={8}>
-            {results.map((result) => (
-              <Flex key={result.card} gap={8} align="center" wrap>
-                <Tag color={result.ok ? "green" : "red"} className="hash-short">
-                  {shortHash(result.card, 10)}
-                </Tag>
-                <Typography.Text type={result.ok ? undefined : "danger"}>
-                  {result.ok ? t.flashResultOk : t.flashResultFailed}
-                </Typography.Text>
-                <Typography.Text type="secondary">{result.message}</Typography.Text>
-              </Flex>
-            ))}
-            {results.length > 0 && results.every((result) => result.ok) && (
-              <Alert
-                type="success"
-                showIcon
-                message={<span style={{ whiteSpace: "pre-line" }}>{t.flashDone}</span>}
-                description={t.howToSee}
-              />
-            )}
-            {results.some((result) => !result.ok) && (
-              <Alert type="error" showIcon message={t.howToSee} />
-            )}
-          </Flex>
-        </Card>
+      </button>
+      {image && (
+        <div className="image-filename" title={image.path}>
+          {image.path.split(/[\\/]/).pop()}
+        </div>
       )}
-    </Flex>
+      <div className="target-summary">
+        <span>刷入目标</span>
+        <strong data-testid="selected-count">{targets.length} 张卡片</strong>
+      </div>
+      <div className="target-chips" aria-label="已选目标">
+        {targets.length ? (
+          targets.map((card) => (
+            <span key={card.hash} title={card.hash}>
+              <CheckCircleFilled />
+              卡片 {String(cards.indexOf(card) + 1).padStart(2, "0")}
+            </span>
+          ))
+        ) : (
+          <span className="target-empty">尚未选择</span>
+        )}
+      </div>
+      <div className="backup-note">
+        <SafetyCertificateOutlined />
+        <span>刷入前自动保存原图，可随时恢复。</span>
+      </div>
+      <Button
+        type="primary"
+        size="large"
+        block
+        className="flash-button"
+        icon={<ArrowRightOutlined />}
+        aria-label="刷入 iPhone"
+        loading={flashing}
+        disabled={!ready}
+        onClick={onFlash}
+      >
+        {flashing ? "正在刷入" : "刷入 iPhone"}
+      </Button>
+      <div className="composer-hint" role="status">
+        {hint}
+      </div>
+      {results && (
+        <div className="flash-results" aria-live="polite">
+          <Alert
+            showIcon
+            type={succeeded === results.length ? "success" : "error"}
+            title={
+              succeeded === results.length ? "刷入完成" : "部分卡片未能刷入"
+            }
+            description={
+              succeeded === results.length
+                ? "重新打开「钱包」查看新卡面。"
+                : results
+                    .filter((result) => !result.ok)
+                    .map(
+                      (result) =>
+                        shortHash(result.card, 4) + "：" + result.message,
+                    )
+                    .join("\n")
+            }
+          />
+        </div>
+      )}
+    </div>
   );
 }

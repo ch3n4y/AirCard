@@ -1,7 +1,6 @@
 # AirCard -- Tauri + Rust.
 #
-# `legacy/` still holds the previous SwiftUI + Python implementation, and its test
-# suite is the behavioural spec the Rust port is checked against:
+# `legacy/` retains Python reference code and tests for the Rust port:
 #   make test-legacy
 #
 # `make test` is the fast suite: the two library crates, no Tauri and no window.
@@ -33,9 +32,9 @@ install: ## frontend dependencies
 dev: ## run the app with hot reload
 	npm run tauri dev
 
-bundle: ## macOS .app and .dmg, then signed and verified
-	npm run tauri build
-	./scripts/sign-macos.sh
+bundle: ## macOS .app, signed before creating .dmg and .zip
+	npm run tauri -- build --bundles app
+	./scripts/package-macos.sh
 
 sign: ## re-sign and verify an existing bundle
 	./scripts/sign-macos.sh
