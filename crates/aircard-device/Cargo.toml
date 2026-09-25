@@ -1,0 +1,11 @@
+[package]
+name = "aircard-device"
+description = "Discovery, card detection and the AirTraffic escape for an iPhone"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+regex = "1"
+thiserror.workspace = true

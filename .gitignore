@@ -1,10 +1,29 @@
+# macOS
 .DS_Store
+
+# Rust / Tauri
+target/
+src-tauri/gen/
+src-tauri/target/
+
+# Node / frontend
+node_modules/
+dist/
+*.local
+npm-debug.log*
+*.log
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Python (legacy/)
 __pycache__/
 *.pyc
 *.pyo
-*.swp
-*~
+
+# Build output
 build/
 .tmp/
 *.dmg
-.serena/

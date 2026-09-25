@@ -1,0 +1,24 @@
+[package]
+name = "aircard"
+description = "Replace the artwork on an Apple Wallet card from a Mac"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# The `_lib` suffix keeps the lib name from colliding with the bin name; see
+# https://github.com/rust-lang/cargo/issues/8519
+[lib]
+name = "aircard_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde.workspace = true
+serde_json.workspace = true
+aircard-core = { path = "../crates/aircard-core" }
+aircard-device = { path = "../crates/aircard-device" }
