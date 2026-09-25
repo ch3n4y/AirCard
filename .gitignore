@@ -27,3 +27,7 @@ __pycache__/
 build/
 .tmp/
 *.dmg
+
+# Browser tests
+playwright-report/
+test-results/

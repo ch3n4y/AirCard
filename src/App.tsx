@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { App as AntApp, ConfigProvider, Flex, Tabs, Tag, Typography } from "antd";
+import { App as AntApp, Button, ConfigProvider, Drawer } from "antd";
+import { CreditCardOutlined, ToolOutlined } from "@ant-design/icons";
+import { isTauri } from "@tauri-apps/api/core";
 import zhCN from "antd/locale/zh_CN";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -37,21 +39,31 @@ export function AirCard() {
   const [cards, setCards] = useState<Card[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [scan, setScan] = useState<ScanStatus | null>(null);
-  const [image, setImage] = useState<{ path: string; preview: string } | null>(null);
+  const [image, setImage] = useState<{ path: string; preview: string } | null>(
+    null,
+  );
   const [results, setResults] = useState<FlashResult[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [faces, setFaces] = useState<{ done: number; total: number } | null>(
+    null,
+  );
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
   const [dropping, setDropping] = useState(false);
-  const [faces, setFaces] = useState<{ done: number; total: number } | null>(null);
+  const operation = useRef(false);
   const facesStop = useRef(false);
 
   const run: Run = useCallback(
     async (label, work) => {
+      if (operation.current) return;
+      operation.current = true;
       setBusy(label);
       try {
         await work();
       } catch (error) {
         message.error(String(error));
       } finally {
+        operation.current = false;
         setBusy(null);
       }
     },
@@ -70,6 +82,7 @@ export function AirCard() {
       );
     } catch (error) {
       setDevices([]);
+      setUdid(null);
       setDeviceProblem(String(error));
     }
   }, []);
@@ -90,7 +103,9 @@ export function AirCard() {
    */
   const loadFaces = useCallback(
     async (list: Card[], device: string) => {
-      const wanted = list.filter((card) => !card.has_artwork).map((card) => card.hash);
+      const wanted = list
+        .filter((card) => !card.has_artwork)
+        .map((card) => card.hash);
       if (wanted.length === 0) return;
       facesStop.current = false;
       setFaces({ done: 0, total: wanted.length });
@@ -144,7 +159,8 @@ export function AirCard() {
   }, [scan?.running]);
 
   useEffect(() => {
-    if (scan?.running !== false || !udid || (scan.found.length ?? 0) === 0) return;
+    if (scan?.running !== false || !udid || (scan.found.length ?? 0) === 0)
+      return;
     void api
       .foldScan(udid)
       .then((list) => {
@@ -157,14 +173,19 @@ export function AirCard() {
 
   const loadImage = useCallback(
     async (path: string) => {
-      await run(t.loadingImage, async () => {
+      setImageLoading(true);
+      try {
         const preview = await api.imagePreview(path);
         if (!preview) throw new Error(t.needImage);
         setImage({ path, preview });
         setResults(null);
-      });
+      } catch (error) {
+        message.error(String(error));
+      } finally {
+        setImageLoading(false);
+      }
     },
-    [run],
+    [message],
   );
 
   const pickImage = useCallback(async () => {
@@ -174,7 +195,16 @@ export function AirCard() {
       filters: [
         {
           name: "图片",
-          extensions: ["png", "jpg", "jpeg", "heic", "webp", "tiff", "gif", "bmp"],
+          extensions: [
+            "png",
+            "jpg",
+            "jpeg",
+            "heic",
+            "webp",
+            "tiff",
+            "gif",
+            "bmp",
+          ],
         },
       ],
     });
@@ -183,6 +213,8 @@ export function AirCard() {
 
   // 拖进来的图片：原生拖放才能拿到真实路径，浏览器那套 onDrop 拿不到。
   useEffect(() => {
+    if (!isTauri()) return;
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     void getCurrentWebview()
       .onDragDropEvent((event) => {
@@ -192,14 +224,21 @@ export function AirCard() {
         }
         setDropping(false);
         if (event.payload.type !== "drop") return;
-        const path = event.payload.paths.find((dropped) => IMAGE_FILES.test(dropped));
+        const path = event.payload.paths.find((dropped) =>
+          IMAGE_FILES.test(dropped),
+        );
         if (path) void loadImage(path);
       })
       .then((stop) => {
-        unlisten = stop;
-      });
-    return () => unlisten?.();
-  }, [loadImage]);
+        if (disposed) stop();
+        else unlisten = stop;
+      })
+      .catch((error) => message.error(String(error)));
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [loadImage, message]);
 
   const startScan = () =>
     void run(t.scanCards, async () => {
@@ -219,11 +258,11 @@ export function AirCard() {
       await refreshCards();
     });
 
-  const onCardsChanged = () =>
-    void refreshCards().catch(() => undefined);
+  const onCardsChanged = () => void refreshCards().catch(() => undefined);
 
   // 自动读取卡面期间，设备按钮同样要失效——同一台手机上不能有两个会话。
-  const busyLabel = busy ?? (faces ? t.readingFaces : null);
+  const busyLabel =
+    busy ?? (scan?.running ? t.scanningNow : faces ? t.readingFaces : null);
 
   const cardTab = (
     <CardsPanel
@@ -231,6 +270,7 @@ export function AirCard() {
       cards={cards}
       scan={scan}
       selected={selected}
+      selectionLocked={busy === t.flashingCards}
       busy={busyLabel}
       run={run}
       onSelectionChange={setSelected}
@@ -246,82 +286,89 @@ export function AirCard() {
   );
 
   return (
-    <Flex
-      vertical
-      gap={12}
-      style={{ padding: 16, height: "100%", boxSizing: "border-box" }}
-    >
-      <Flex align="center" justify="space-between" gap={12} wrap>
-        <Flex align="baseline" gap={8}>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            {t.app}
-          </Typography.Title>
-          <Typography.Text type="secondary">{t.subtitle}</Typography.Text>
-        </Flex>
-        <Flex gap={8} align="center" wrap>
-          {t.guide.map((step, index) => (
-            <Tag key={step}>
-              {index + 1} {step}
-            </Tag>
-          ))}
-        </Flex>
-      </Flex>
-
-      <DeviceBar
-        devices={devices}
-        selected={udid}
-        problem={deviceProblem}
-        busy={busyLabel}
-        onSelect={setUdid}
-        onRefresh={() => void run(t.refreshDevices, refreshDevices)}
-      />
-
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-        <Tabs
-          activeKey={dropping ? "flash" : undefined}
-          items={[
-            { key: "cards", label: t.cards, children: cardTab },
-            {
-              key: "flash",
-              label: t.flash,
-              children: (
-                <FlashPanel
-                  cards={cards}
-                  selected={selected}
-                  image={image}
-                  results={results}
-                  busy={busyLabel}
-                  onPick={() => void pickImage()}
-                  onFlash={flash}
-                />
-              ),
-            },
-            {
-              key: "maintenance",
-              label: t.maintenance,
-              children: (
-                <MaintenancePanel
-                  udid={udid}
-                  paths={paths}
-                  busy={busyLabel}
-                  run={run}
-                />
-              ),
-            },
-          ]}
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="brand">
+          <span className="brand-mark">
+            <CreditCardOutlined />
+          </span>
+          {t.app}
+        </div>
+        <div className="header-actions">
+          <DeviceBar
+            devices={devices}
+            selected={udid}
+            problem={deviceProblem}
+            busy={busyLabel}
+            onSelect={setUdid}
+            onRefresh={() => void run(t.refreshDevices, refreshDevices)}
+          />
+          <Button
+            className="maintenance-button"
+            icon={<ToolOutlined />}
+            aria-label="维护"
+            title="维护"
+            onClick={() => setMaintenanceOpen(true)}
+          />
+        </div>
+      </header>
+      <main className="workspace">
+        <section className="cards-workspace" aria-label="卡片">
+          <div className="page-heading">
+            <h1>我的卡片</h1>
+            <p>选择卡片，换上新卡面。</p>
+          </div>
+          {cardTab}
+        </section>
+        <aside className="composer" aria-label="刷入卡面">
+          <FlashPanel
+            cards={cards}
+            selected={selected}
+            image={image}
+            results={results}
+            busy={busyLabel}
+            connected={udid !== null}
+            imageLoading={imageLoading}
+            dropping={dropping}
+            onPick={() => void pickImage()}
+            onFlash={flash}
+          />
+        </aside>
+      </main>
+      <Drawer
+        title="维护"
+        open={maintenanceOpen}
+        onClose={() => setMaintenanceOpen(false)}
+        size={580}
+        destroyOnHidden
+      >
+        <MaintenancePanel
+          udid={udid}
+          paths={paths}
+          busy={busyLabel}
+          run={run}
         />
-      </div>
-
-      <Typography.Text type={busyLabel ? "warning" : "secondary"}>
-        {busyLabel ? `${busyLabel}…` : t.ready}
-      </Typography.Text>
-    </Flex>
+      </Drawer>
+    </div>
   );
 }
 
 export default function App() {
   return (
-    <ConfigProvider locale={zhCN}>
+    <ConfigProvider
+      locale={zhCN}
+      theme={{
+        token: {
+          colorPrimary: "#4378ed",
+          colorText: "#202b41",
+          colorTextSecondary: "#8793a6",
+          colorBorder: "#e3e9f2",
+          borderRadius: 10,
+          fontFamily: '-apple-system, "PingFang SC", sans-serif',
+          controlHeight: 36,
+        },
+      }}
+    >
       <AntApp>
         <AirCard />
       </AntApp>

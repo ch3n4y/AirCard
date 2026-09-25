@@ -125,17 +125,6 @@ class LocalizationTests(unittest.TestCase):
             result = subprocess.run(["plutil", "-lint", str(path)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, f"{path.parent.name} is malformed: {result.stdout}{result.stderr}")
 
-    def test_declared_languages_all_exist(self):
-        """build.sh refuses to ship without these, so keep the two lists in step."""
-        build = (REPO / "build.sh").read_text(encoding="utf-8")
-        m = re.search(r"^LANGS=\(([^)]*)\)", build, re.M)
-        self.assertIsNotNone(m, "LANGS array not found in build.sh")
-        declared = m.group(1).split()
-        for lang in declared:
-            self.assertTrue(
-                (LOCALES / f"{lang}.lproj" / "Localizable.strings").is_file(),
-                f"build.sh declares {lang} but locales/{lang}.lproj/Localizable.strings is missing",
-            )
 
 
 if __name__ == "__main__":

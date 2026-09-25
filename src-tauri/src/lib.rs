@@ -127,18 +127,22 @@ impl App {
 /// cable. The same call from a thread of its own works, which is why the scan --
 /// the only device operation that spawns a thread -- was the only one that ever
 /// succeeded.
-fn off_the_main_thread<T, F>(work: F) -> Result<T, String>
+async fn off_the_main_thread<T, F>(work: F) -> Result<T, String>
 where
     T: Send + 'static,
     F: FnOnce() -> Result<T, String> + Send + 'static,
 {
-    match std::thread::spawn(work).join() {
+    // Keep a fresh thread for the framework's run loop, but await its join on
+    // a blocking worker so AppKit remains free to handle input and repaint.
+    tauri::async_runtime::spawn_blocking(move || match std::thread::spawn(work).join() {
         Ok(result) => result,
         Err(_) => {
             log_line("a device operation panicked on its own thread");
             Err("操作未能完成。请查看日志。".to_owned())
         }
-    }
+    })
+    .await
+    .map_err(|error| failed("操作未能完成。请查看日志。", error))?
 }
 
 /// Holds the phone for as long as it lives.
@@ -242,7 +246,7 @@ fn app_paths() -> AppPaths {
 
 /// iPhones this Mac can reach right now.
 #[tauri::command]
-fn list_devices() -> Result<Vec<aircard_device::DeviceInfo>, String> {
+async fn list_devices() -> Result<Vec<aircard_device::DeviceInfo>, String> {
     off_the_main_thread(|| {
         let devices = aircard_device::list_devices().map_err(|error| {
             failed(
@@ -255,6 +259,7 @@ fn list_devices() -> Result<Vec<aircard_device::DeviceInfo>, String> {
         log_line(&format!("listed {} device(s)", devices.len()));
         Ok(devices)
     })
+    .await
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +291,14 @@ fn forget_cards(hashes: Vec<String>) -> Result<(), String> {
 ///
 /// The full face is megabytes of PNG; a list of them would be a list of stalls.
 #[tauri::command]
-fn card_thumbnail(udid: String, hash: String) -> Option<String> {
+async fn card_thumbnail(udid: String, hash: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || card_thumbnail_now(udid, hash))
+        .await
+        .ok()
+        .flatten()
+}
+
+fn card_thumbnail_now(udid: String, hash: String) -> Option<String> {
     let png = artwork_cache().read(&udid, &hash)?;
     match artwork::thumbnail_png(&png, THUMBNAIL) {
         Ok(small) => Some(data_url(&small)),
@@ -304,7 +316,13 @@ fn forget_artwork(udid: String, hash: String) {
 
 /// The picture that is about to be flashed, fitted to a card face.
 #[tauri::command]
-fn image_preview(path: String) -> Result<Option<String>, String> {
+async fn image_preview(path: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || image_preview_now(path))
+        .await
+        .map_err(|error| failed("无法读取这张图片。", error))?
+}
+
+fn image_preview_now(path: String) -> Result<Option<String>, String> {
     let fitted = fit_to_face(&path)?;
     match artwork::thumbnail_png(&fitted, PREVIEW) {
         Ok(small) => Ok(Some(data_url(&small))),
@@ -354,9 +372,9 @@ fn read_asset(device: &Device, hash: &str, name: &str) -> Result<Vec<u8>, String
 
 /// Reads a card's face off the phone and keeps it, so the list can show it.
 #[tauri::command]
-fn read_artwork(app: State<App>, udid: String, hash: String) -> Result<(), String> {
+async fn read_artwork(app: State<'_, App>, udid: String, hash: String) -> Result<(), String> {
     let app = app.shared();
-    off_the_main_thread(move || read_artwork_now(&app, udid, hash))
+    off_the_main_thread(move || read_artwork_now(&app, udid, hash)).await
 }
 
 fn read_artwork_now(app: &App, udid: String, hash: String) -> Result<(), String> {
@@ -372,12 +390,13 @@ fn read_artwork_now(app: &App, udid: String, hash: String) -> Result<(), String>
 
 /// Saves the original artwork of a card, once.
 #[tauri::command]
-fn save_original(app: State<App>, udid: String, hash: String) -> Result<(), String> {
+async fn save_original(app: State<'_, App>, udid: String, hash: String) -> Result<(), String> {
     let app = app.shared();
     off_the_main_thread(move || {
         let _turn = Turn::take(&app)?;
         save_original_locked(&udid, &hash)
     })
+    .await
 }
 
 fn save_original_locked(udid: &str, hash: &str) -> Result<(), String> {
@@ -399,9 +418,9 @@ fn save_original_locked(udid: &str, hash: &str) -> Result<(), String> {
 
 /// Puts a card's saved original back on the phone.
 #[tauri::command]
-fn restore_original(app: State<App>, udid: String, hash: String) -> Result<(), String> {
+async fn restore_original(app: State<'_, App>, udid: String, hash: String) -> Result<(), String> {
     let app = app.shared();
-    off_the_main_thread(move || restore_original_now(&app, udid, hash))
+    off_the_main_thread(move || restore_original_now(&app, udid, hash)).await
 }
 
 fn restore_original_now(app: &App, udid: String, hash: String) -> Result<(), String> {
@@ -581,8 +600,8 @@ fn clear_scan_record(udid: String) -> Result<(), String> {
 /// this app does that cannot be undone from the phone, and the moment to make it
 /// undoable is before it happens, not after.
 #[tauri::command]
-fn flash_cards(
-    app: State<App>,
+async fn flash_cards(
+    app: State<'_, App>,
     udid: String,
     hashes: Vec<String>,
     image: String,
@@ -593,14 +612,14 @@ fn flash_cards(
     if image.is_empty() {
         return Err("请先选择要刷入的图片。".to_owned());
     }
-    // Fitting the picture is local work; everything that touches the phone
-    // happens on a thread of its own.
-    let png = fit_to_face(&image)?;
-    let assets =
-        artwork::build_assets(&png).map_err(|error| failed("无法准备卡面素材。", error))?;
-
     let app = app.shared();
-    off_the_main_thread(move || flash_now(&app, udid, hashes, assets))
+    off_the_main_thread(move || {
+        let png = fit_to_face(&image)?;
+        let assets =
+            artwork::build_assets(&png).map_err(|error| failed("无法准备卡面素材。", error))?;
+        flash_now(&app, udid, hashes, assets)
+    })
+    .await
 }
 
 fn flash_now(
@@ -670,9 +689,9 @@ fn flash_now(
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-fn leftovers(app: State<App>, udid: String) -> Result<Vec<LeftoverView>, String> {
+async fn leftovers(app: State<'_, App>, udid: String) -> Result<Vec<LeftoverView>, String> {
     let app = app.shared();
-    off_the_main_thread(move || leftovers_now(&app, udid))
+    off_the_main_thread(move || leftovers_now(&app, udid)).await
 }
 
 fn leftovers_now(app: &App, udid: String) -> Result<Vec<LeftoverView>, String> {
@@ -692,9 +711,13 @@ fn leftovers_now(app: &App, udid: String) -> Result<Vec<LeftoverView>, String> {
 }
 
 #[tauri::command]
-fn sweep_leftovers(app: State<App>, udid: String, names: Vec<String>) -> Result<(), String> {
+async fn sweep_leftovers(
+    app: State<'_, App>,
+    udid: String,
+    names: Vec<String>,
+) -> Result<(), String> {
     let app = app.shared();
-    off_the_main_thread(move || sweep_leftovers_now(&app, udid, names))
+    off_the_main_thread(move || sweep_leftovers_now(&app, udid, names)).await
 }
 
 fn sweep_leftovers_now(app: &App, udid: String, names: Vec<String>) -> Result<(), String> {
@@ -810,6 +833,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn waiting_for_device_work_does_not_block_the_command_future() {
+        use std::future::Future;
+        use std::task::{Context, Waker};
+        use std::time::Duration;
+
+        let (release, wait) = std::sync::mpsc::channel();
+        let work = off_the_main_thread(move || {
+            wait.recv_timeout(Duration::from_secs(2))
+                .expect("released by the caller");
+            Ok(42)
+        });
+        let mut work = std::pin::pin!(work);
+        let mut context = Context::from_waker(Waker::noop());
+        assert!(work.as_mut().poll(&mut context).is_pending());
+        release.send(()).unwrap();
+        assert_eq!(tauri::async_runtime::block_on(work).unwrap(), 42);
+    }
+
+    #[test]
     fn the_log_stamp_counts_from_the_epoch_in_utc() {
         assert_eq!(civil_from_days(0), (1970, 1, 1));
         assert_eq!(civil_from_days(1), (1970, 1, 2));
@@ -846,15 +888,17 @@ mod tests {
             utc_stamp()
         ));
         fs::write(&path, TINY_PNG).expect("the fixture");
-        let preview = image_preview(path.to_string_lossy().into_owned())
-            .expect("a preview")
-            .expect("a data url");
+        let preview =
+            tauri::async_runtime::block_on(image_preview(path.to_string_lossy().into_owned()))
+                .expect("a preview")
+                .expect("a data url");
         assert!(preview.starts_with("data:image/png;base64,"), "{preview}");
         assert!(preview.len() > 200, "a real picture, not a stub");
         let _ = fs::remove_file(&path);
 
         // A path that is not there is a Chinese sentence, not a panic.
-        let missing = image_preview("/nowhere/at/all.png".to_owned());
+        let missing =
+            tauri::async_runtime::block_on(image_preview("/nowhere/at/all.png".to_owned()));
         assert_eq!(missing.expect_err("an error"), "找不到这张图片。");
     }
 
