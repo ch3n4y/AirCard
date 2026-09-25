@@ -158,6 +158,10 @@ enum Plan {
     /// move is the case that costs data when it is handled wrong, so it has to be
     /// reachable from a test.
     Interrupted(usize),
+    /// The phone answers that the move happened and moves nothing. Measured on
+    /// iOS 27: this is what it does to an asset that is already inside Media,
+    /// and it is the reason a write has to check the payload is gone.
+    Ignored,
 }
 
 /// One device, shared by the three fake roles and by the test.
@@ -464,6 +468,11 @@ impl AssetMover for Phone {
         if plan == Plan::Refused {
             return Err(interrupted(&assets[0].0));
         }
+        // Acked and then nothing: the phone says the move happened and the
+        // staging tree is left exactly as it was.
+        if plan == Plan::Ignored {
+            return Ok(());
+        }
 
         let mut fs = self.fs.borrow_mut();
         for (index, (identifier, destination)) in assets.iter().enumerate() {
@@ -768,4 +777,28 @@ fn the_phone_will_not_hand_over_an_asset_the_ledger_does_not_name() {
         "airlift-recovered-00112233445566778899".to_owned(),
     )]);
     assert!(refused.is_err());
+}
+
+#[test]
+fn a_move_the_phone_acknowledged_and_did_not_do_is_not_a_silent_success() {
+    let phone = Phone::new();
+    phone.add_card(b"the artwork the card came with");
+    // The phone answers, the connection is happy, and nothing moved -- which is
+    // what iOS 27 does to an asset that is already inside Media. The payload is
+    // still sitting in the staging tree, and that is the one place the question
+    // can be asked.
+    phone.plans(&[Plan::Ignored]);
+
+    let error = phone
+        .airlift()
+        .write_file(CARD, ARTWORK[0], b"a new face", 1)
+        .expect_err("a write that wrote nothing is not a write");
+
+    assert!(matches!(error, AirliftError::Move { .. }), "{error}");
+    assert_eq!(
+        phone.card_artwork().as_deref(),
+        Some(&b"the artwork the card came with"[..]),
+        "the card is as it was, which is the only honest outcome"
+    );
+    assert!(leftovers_of(&phone).is_empty());
 }

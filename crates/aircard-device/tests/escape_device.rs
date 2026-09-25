@@ -8,9 +8,9 @@
 //!       -- --ignored --test-threads=1 --nocapture
 //!
 //! The first test rehearses the whole pipeline -- zip, symlink, ledger, move,
-//! read back, write back, clean up -- on a file this app makes inside `Media`,
-//! where nothing of anyone's is at stake. The second does the same to a real
-//! card's artwork, and is only worth trying once the first one passes:
+//! read, write, remove, clean up -- on a file this app creates itself, in a
+//! directory that exists and is nobody's business. The second does the same to a
+//! real card's artwork, and is only worth trying once the first one passes:
 //!
 //!   AIRCARD_TEST_CARD=<card hash> AIRCARD_TEST_OUT=<path> cargo test ...
 //!
@@ -18,12 +18,26 @@
 //! compared against a known copy. Comparing is the point: these runs are the
 //! first time any of this has touched a card, and "it did not error" is not the
 //! same answer as "the artwork is the artwork".
+//!
+//! Where the rehearsal puts its file matters. A first attempt used a file inside
+//! `Media` and the phone moved the symlink and left the file alone, while
+//! reporting that the move had happened -- measured on iOS 27. An asset the
+//! phone already holds in its own sync root is not an asset to fetch. Cards are
+//! not in there, and neither is anything else worth this trouble: every real
+//! target is outside `Media`, so the rehearsal is too.
 
 use std::env;
 use std::fs;
 
 use aircard_device::airlift::payload::token;
-use aircard_device::{card_directory, Device, MediaSource};
+use aircard_device::{card_directory, Device};
+
+/// A directory that has to exist, is outside Media, and will not miss one file.
+///
+/// Every card lives under `/var/mobile/Library/Passes`, so it is there; and
+/// `aircard-probe-<token>` in it is a file nothing reads, which this test removes
+/// again by the same escape that made it.
+const PROBE_DIRECTORY: &str = "/var/mobile/Library";
 
 /// The phone to work on. Never guessed: a test that picks a device by itself can
 /// pick the wrong one.
@@ -31,13 +45,8 @@ fn device_udid() -> String {
     env::var("AIRCARD_TEST_UDID").expect("AIRCARD_TEST_UDID must name the phone to use")
 }
 
-/// A file of our own inside Media.
-///
-/// Deliberately outside the names the escape generates, so it can never be
-/// mistaken for staging. What it proves is that the escape takes *its* names back
-/// down, which the test checks separately by listing them.
-fn probe_directory() -> String {
-    format!("/var/mobile/Media/aircard-probe-{}", token())
+fn probe_leaf() -> String {
+    format!("aircard-probe-{}", token())
 }
 
 #[test]
@@ -45,46 +54,48 @@ fn probe_directory() -> String {
 fn the_whole_pipeline_runs_on_a_file_of_its_own() {
     let device = Device::new(device_udid());
     let airlift = device.airlift();
-    let directory = probe_directory();
-    let leaf = "probe.bin";
-    let before = b"an aircard probe, not a card".to_vec();
+    let leaf = probe_leaf();
+    let first = b"an aircard probe, not a card".to_vec();
+    let second = b"and this is the second face it wears".to_vec();
 
-    {
-        let mut media = device.open().expect("AFC should have opened");
-        media
-            .create_directory(&directory)
-            .expect("the probe directory should have been made");
-        media
-            .write(&format!("{directory}/{leaf}"), &before)
-            .expect("the probe file should have been written");
-    }
+    // Nothing can create a file out there -- that is the whole reason the escape
+    // exists -- so the probe is written by the escape itself.
+    airlift
+        .write_files(PROBE_DIRECTORY, &[(leaf.clone(), first.clone())], 3)
+        .expect("the escape should have written the probe file");
 
     let read = airlift
-        .read_file(&directory, leaf, 3)
-        .expect("the rehearsal should have read the file");
+        .read_file(PROBE_DIRECTORY, &leaf, 3)
+        .expect("the escape should have read the probe file");
     assert_eq!(
-        read.data, before,
+        read.data, first,
         "the bytes that came back are not the ones that went in"
     );
     assert!(
         !read.card_needs_repair,
-        "the file did not get its bytes back, and a copy is at {:?}",
+        "the file did not get its bytes back, and the only copy is at {:?}",
         read.copy_at
     );
 
-    {
-        let mut media = device.open().expect("AFC should have opened");
-        let observed = media
-            .read(&format!("{directory}/{leaf}"), 1 << 20)
-            .expect("the file should still be there");
-        assert_eq!(observed, before, "the file has to be exactly as it was");
-        media
-            .remove(&format!("{directory}/{leaf}"))
-            .expect("the probe file should have been removed");
-        media
-            .remove(&directory)
-            .expect("the probe directory should have been removed");
-    }
+    // Overwrite it and read that back too: writing and reading are the two
+    // halves the app uses, and each has to survive the other.
+    airlift
+        .write_files(PROBE_DIRECTORY, &[(leaf.clone(), second.clone())], 3)
+        .expect("the escape should have taken the second face");
+    let again = airlift
+        .read_file(PROBE_DIRECTORY, &leaf, 3)
+        .expect("the second face should have read back");
+    assert_eq!(again.data, second);
+
+    // Removing it is how a rendered card face is invalidated, and it has to be a
+    // real unlink: overwriting a face leaves Wallet rendering the old one.
+    airlift
+        .remove_files(PROBE_DIRECTORY, std::slice::from_ref(&leaf), 3)
+        .expect("the escape should have removed the probe file");
+    assert!(
+        airlift.read_file(PROBE_DIRECTORY, &leaf, 1).is_err(),
+        "the probe file came back"
+    );
 
     let leftovers = airlift.leftovers().expect("leftovers should list");
     assert!(

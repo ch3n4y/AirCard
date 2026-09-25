@@ -357,7 +357,26 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
             });
         }
 
-        let data = self.read_moved(&plan.recovered())?;
+        let data = match self.read_moved(&plan.recovered()) {
+            Ok(data) => data,
+            Err(error) => {
+                // The phone moved the file and that is the only copy of it left,
+                // so the staging tree stays where it is and a person is told
+                // about it. The ledger is a different matter: the phone folds
+                // what was staged into its own library file, and an entry naming
+                // an asset that will never arrive outlives the run. So the ledger
+                // goes back, and everything else is left exactly where it is.
+                sleep(SETTLE);
+                let failures = self.restore_ledger(&ledger);
+                return Err(with_cleanup(
+                    error,
+                    Cleanup {
+                        failures,
+                        ..Cleanup::default()
+                    },
+                ));
+            }
+        };
         // The original is out of the card directory and this is the only copy of
         // it anywhere else, so it goes back before anything else is attempted.
         let restored = self.write_file(target, leaf, &data, 3);
@@ -409,29 +428,36 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
         let ledger = self.snapshot()?;
         let mut assets = vec![plan.link_asset()];
         let mut destinations = vec![plan.link()];
+        let mut payloads: Vec<String> = Vec::new();
         for (index, (leaf, _)) in files.iter().enumerate() {
-            // The first payload also goes out under the plain `payload` name,
-            // and that is the one this asks for: it is the name the archive has
-            // always carried, so an older phone reading the compatibility entry
-            // sees the same single-file staging it used to.
-            assets.push(format!(
-                "../../{}/{name}",
-                plan.source(),
-                name = if index == 0 {
-                    "payload".to_owned()
-                } else {
-                    format!("payload_{index}")
-                }
-            ));
+            // `payload_<index>` for every file, which is the name the archive has
+            // always numbered them with. The archive also carries the first
+            // payload under the plain `payload` name, for a phone that only reads
+            // that one; nothing here asks for it.
+            let name = format!("payload_{index}");
+            assets.push(format!("../../{}/{name}", plan.source()));
+            payloads.push(name);
             destinations.push(join_path(&plan.link(), leaf));
         }
         let archive = build_archive_multi(target, files);
-
         if let Err(error) = self.stage(&plan, &ledger, &archive, &assets) {
             self.finish(&plan, &ledger, true);
             return Err(error);
         }
         self.move_and_clean(&plan, &ledger, &assets, &destinations)?;
+        // The phone's move is a move: what it took is gone from the staging
+        // tree. A payload still sitting there was never taken, and a write that
+        // reports success without the bytes having moved is the worst answer
+        // this app can give.
+        if let Some(path) = self.payload_left_behind(&plan, &payloads)? {
+            let cleanup = self.finish(&plan, &ledger, true);
+            return Err(with_cleanup(
+                AirliftError::Move {
+                    detail: format!("the phone left {path} where it was"),
+                },
+                cleanup,
+            ));
+        }
         let cleanup = self.finish(&plan, &ledger, true);
         if !cleanup.is_complete() {
             return Err(AirliftError::Cleanup {
@@ -762,6 +788,28 @@ impl<S: MediaSource, A: AssetMover, U: ArchiveUpload> Airlift<S, A, U> {
                 Err(with_cleanup(error, cleanup))
             }
         }
+    }
+
+    /// The first payload still sitting in the staging tree, if the phone left
+    /// one behind.
+    /// The first payload this app asked for that is still in the staging tree.
+    ///
+    /// A move takes the source away, so a payload still sitting there is a move
+    /// that never happened. Nothing else can tell: the destination is reached
+    /// through the symlink and AFC cannot follow that, so the staging tree is the
+    /// one place the question can be asked. Only names this app asked for count,
+    /// because the archive carries a compatibility copy under a name nothing
+    /// requests and that one is left behind on purpose.
+    fn payload_left_behind(&self, plan: &Staging, requested: &[String]) -> Result<Option<String>> {
+        let mut media = self.source.open()?;
+        let source = plan.source();
+        let mut left: Vec<String> = requested
+            .iter()
+            .map(|name| format!("{source}/{name}"))
+            .filter(|path| media.exists(path))
+            .collect();
+        left.sort();
+        Ok(left.into_iter().next())
     }
 
     fn read_moved(&self, recovered: &str) -> Result<Vec<u8>> {
