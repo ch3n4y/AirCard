@@ -114,15 +114,8 @@ def list_devices() -> list[dict]:
     return []
 
 
-def get_connected_device() -> dict | None:
-    """Picks the connected iPhone out of the enumerated devices."""
-    usable = [d for d in list_devices() if d.get("udid") and d.get("product")]
-    if not usable:
-        return None
-    # Enumeration order is not stable, and iPads can appear alongside the iPhone.
-    iphones = [d for d in usable if str(d["product"]).startswith("iPhone")]
-    device = (iphones or usable)[0]
-
+def _normalize_device(device: dict) -> dict:
+    """Shapes a raw helper entry into the fields the app consumes."""
     return {
         "udid": device["udid"],
         "name": device.get("name") or "iPhone",
@@ -131,7 +124,58 @@ def get_connected_device() -> dict | None:
         "language": device.get("language") or "en",
         "locale": device.get("locale") or "",
         "bold_text": device.get("bold_text"),
+        "connection": device.get("connection") or "unknown",
+        # The app decodes this as a plain Bool, so it has to be here. Anything
+        # that came back from enumeration is reachable by definition.
+        "connected": True,
     }
+
+
+# Cabled beats Wi-Fi. "unknown" sits between the two so an older helper that
+# cannot report the link still outranks a phone we know is remote.
+_CONNECTION_RANK = {"usb": 0, "unknown": 1, "network": 2}
+
+
+def _device_sort_key(device: dict) -> tuple:
+    """Orders devices the same way every time: iPhones, then USB, then by udid.
+
+    Helper enumeration order is not stable and iPads and Wi-Fi phones show up
+    next to the cabled one, so without a fixed order the app can latch onto a
+    different device between scans.
+    """
+    is_iphone = str(device.get("product") or "").startswith("iPhone")
+    connection = str(device.get("connection") or "unknown").lower()
+    return (
+        0 if is_iphone else 1,
+        _CONNECTION_RANK.get(connection, 1),
+        str(device.get("name") or ""),
+        str(device.get("udid") or ""),
+    )
+
+
+def list_connected_devices() -> list[dict]:
+    """Returns every usable device, deterministically ordered (best first)."""
+    usable = [d for d in list_devices() if d.get("udid") and d.get("product")]
+    usable.sort(key=_device_sort_key)
+    return [_normalize_device(d) for d in usable]
+
+
+def get_connected_device(preferred_udid: str | None = None) -> dict | None:
+    """Picks a connected iPhone, honoring an explicit target when one is given.
+
+    A preferred_udid must match exactly. If that phone is gone this returns None
+    instead of quietly handing back a different one, so a flash never lands on a
+    phone nobody picked. Only automatic selection falls back to the best device.
+    """
+    devices = list_connected_devices()
+    if not devices:
+        return None
+    if preferred_udid:
+        for device in devices:
+            if device["udid"] == preferred_udid:
+                return device
+        return None
+    return devices[0]
 
 
 def syslog_command(udid: str) -> list[str] | None:
