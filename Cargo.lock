@@ -31,6 +31,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "aircard-apple-ffi"
+version = "1.3.0"
+dependencies = [
+ "libc",
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "aircard-core"
 version = "1.3.0"
 dependencies = [
@@ -42,6 +51,7 @@ dependencies = [
 name = "aircard-device"
 version = "1.3.0"
 dependencies = [
+ "aircard-apple-ffi",
  "regex",
  "thiserror 2.0.21",
 ]

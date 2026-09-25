@@ -18,3 +18,10 @@
 pub mod hash;
 
 pub use hash::{hashes_in, is_rejected, is_wallet_line, PLACEHOLDER_HASHES};
+
+/// Device discovery through Apple's own framework.
+///
+/// Re-exported rather than wrapped: on everything but a Mac this resolves to a
+/// clear "not supported" error, which the window shows as such instead of
+/// claiming no phone is plugged in.
+pub use aircard_apple_ffi::{list_devices, DeviceError, DeviceInfo};

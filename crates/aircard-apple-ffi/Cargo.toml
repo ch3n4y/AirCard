@@ -1,0 +1,16 @@
+[package]
+name = "aircard-apple-ffi"
+description = "MobileDevice.framework bindings: discovery, AFC, and the AirTraffic escape"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+thiserror.workspace = true
+serde.workspace = true
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+thiserror.workspace = true
+serde.workspace = true

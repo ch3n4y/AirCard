@@ -9,3 +9,4 @@ repository.workspace = true
 [dependencies]
 regex = "1"
 thiserror.workspace = true
+aircard-apple-ffi = { path = "../aircard-apple-ffi" }

@@ -40,6 +40,16 @@ fn saved_originals(udid: String) -> Vec<String> {
     BackupStore::new(aircard_core::backups_root()).list(&udid)
 }
 
+/// iPhones this Mac can reach right now.
+///
+/// An error is worth surfacing as an error: "nothing is plugged in" and "the
+/// framework would not talk to us" mean very different things to whoever is
+/// holding the phone.
+#[tauri::command]
+fn list_devices() -> Result<Vec<aircard_device::DeviceInfo>, String> {
+    aircard_device::list_devices().map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -47,7 +57,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_paths,
             devices_with_saved_originals,
-            saved_originals
+            saved_originals,
+            list_devices
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
