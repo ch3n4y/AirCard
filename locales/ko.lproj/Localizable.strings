@@ -152,7 +152,7 @@
 "ui.on_your_iphone_double_click" = "iPhone에서 **측면 버튼을 두 번 누르고**(Apple Pay) **Face ID**로 인증한 다음 **카드를 탭**하십시오.";
 "ui.original_saved" = "원본 아트워크 저장됨";
 "ui.passcode_theme_file" = "암호 테마 파일";
-"ui.passcode_theme_successfully_applied_n" = "암호 테마를 적용했습니다!\\\\n\\\\niPhone을 잠갔다 켜거나 재시동하면 새 암호 키패드가 나타납니다.";
+"ui.passcode_theme_successfully_applied_n" = "암호 테마를 적용했습니다!\n\niPhone을 잠갔다 켜거나 재시동하면 새 암호 키패드가 나타납니다.";
 "ui.passcode_themes" = "암호 테마:";
 "ui.passthm_standard_cowabunga_nugget" = ".passthm 표준 (Cowabunga / Nugget)";
 "ui.paste_one_or_more_card" = "카드 해시를 하나 이상 붙여넣으십시오(공백, 쉼표, 줄바꿈으로 구분):";
@@ -177,7 +177,7 @@
 "ui.skin_already_on_iphone" = "스킨이 이미 iPhone에 있음";
 "ui.skin_assigned_and_ready" = "스킨 지정 완료";
 "ui.skin_changed_will_be_flashed" = "스킨이 변경되어 적용됩니다";
-"ui.skins_successfully_applied_to_all" = "선택한 모든 카드에 스킨을 적용했습니다!\\\\n\\\\niPhone에서 지갑 앱을 강제 종료하거나 재시동하면 새 디자인이 나타납니다.";
+"ui.skins_successfully_applied_to_all" = "선택한 모든 카드에 스킨을 적용했습니다!\n\niPhone에서 지갑 앱을 강제 종료하거나 재시동하면 새 디자인이 나타납니다.";
 "ui.slice_circle_desc" = "아트워크를 원형 버튼 아이콘으로 하나씩 잘라냅니다.";
 "ui.slice_seamless_desc" = "아트워크가 원형으로 잘리지 않고 키패드 전체에 이어집니다(Adobe Dog 스타일).";
 "ui.slicing_style" = "분할 방식";

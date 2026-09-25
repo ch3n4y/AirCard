@@ -152,7 +152,7 @@
 "ui.on_your_iphone_double_click" = "在 iPhone 上**连按两下侧边按钮**（Apple Pay），用**面容 ID** 验证，然后**轻点你的卡片**。";
 "ui.original_saved" = "原始图像已存储";
 "ui.passcode_theme_file" = "密码主题文件";
-"ui.passcode_theme_successfully_applied_n" = "密码主题已应用！\\n\\n锁定 iPhone（或重新启动）即可看到新的密码键盘。";
+"ui.passcode_theme_successfully_applied_n" = "密码主题已应用！\n\n锁定 iPhone（或重新启动）即可看到新的密码键盘。";
 "ui.passcode_themes" = "密码主题：";
 "ui.passthm_standard_cowabunga_nugget" = ".passthm 标准（Cowabunga / Nugget）";
 "ui.paste_one_or_more_card" = "粘贴一个或多个卡片哈希（用空格、逗号或换行分隔）：";
@@ -177,7 +177,7 @@
 "ui.skin_already_on_iphone" = "皮肤已在 iPhone 上";
 "ui.skin_assigned_and_ready" = "皮肤已指定，可以刷入";
 "ui.skin_changed_will_be_flashed" = "皮肤有改动，将刷入";
-"ui.skins_successfully_applied_to_all" = "所有选中的卡片都已应用新皮肤！\\n\\n请在 iPhone 上强制退出“钱包”App（或重新启动），即可看到新外观。";
+"ui.skins_successfully_applied_to_all" = "所有选中的卡片都已应用新皮肤！\n\n请在 iPhone 上强制退出“钱包”App（或重新启动），即可看到新外观。";
 "ui.slice_circle_desc" = "图像会被裁切成一个个圆形按键图标。";
 "ui.slice_seamless_desc" = "图像横跨整个键盘且不做圆形裁切（Adobe Dog 风格）。";
 "ui.slicing_style" = "切分方式";

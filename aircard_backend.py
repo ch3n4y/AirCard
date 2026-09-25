@@ -114,6 +114,7 @@ def cmd_backup(udid: str, card_hash: str) -> bool:
 
     pkpass_dir = f"/var/mobile/Library/Passes/Cards/{card_hash}.pkpass"
     originals = []
+    unread = []
     for asset in BACKED_UP_ASSETS:
         try:
             data = read_file(udid, pkpass_dir, asset)
@@ -121,11 +122,19 @@ def cmd_backup(udid: str, card_hash: str) -> bool:
             data = None
         if data:
             originals.append((asset, data))
+        else:
+            unread.append(asset)
 
+    # save_card_backup refuses anything short of the full set, so a card whose
+    # artwork cannot be read in full gets no backup at all rather than one that
+    # would only put part of the card back. Name the files that could not be
+    # read: a PNG-only card is the one case where that is not a transient error.
     if not save_card_backup(udid, card_hash, originals):
+        detail = f" ({', '.join(unread)})" if unread else ""
         print(json.dumps({
             "type": "error", "card": card_hash, "code": "backup.failed",
-            "message": f"Could not read the original artwork for {card_hash[:12]}..."
+            "message": (f"Could not read all of the original artwork for "
+                        f"{card_hash[:12]}...{detail}, so nothing was saved")
         }))
         sys.stdout.flush()
         return False
@@ -154,6 +163,7 @@ def cmd_restore(udid: str, card_hash: str) -> bool:
     pkpass_dir = f"/var/mobile/Library/Passes/Cards/{card_hash}.pkpass"
     total_steps = 2
     all_ok = True
+    stuck = []
 
     print(json.dumps({
         "type": "progress", "card": card_hash, "step": 1, "total": total_steps,
@@ -175,6 +185,32 @@ def cmd_restore(udid: str, card_hash: str) -> bool:
             if not ok_single:
                 all_ok = False
 
+    # Writing the originals back is not enough on its own. A flash replaces the
+    # PNGs and adds cardBackgroundCombined.pdf, and Wallet renders the PDF in
+    # preference to the PNGs, so a backup that holds no PDF -- one taken by an
+    # older build, from a card whose original artwork was PNG-only -- would
+    # leave the skin showing. Anything a flash can write that this backup does
+    # not hold has to come off the card, or the restore is a lie.
+    # remove_files reports success when a leaf is already absent, which is what
+    # a card that was never skinned here looks like.
+    for asset in BACKED_UP_ASSETS:
+        if any(name == asset for name, _ in originals):
+            continue
+        try:
+            ok_removed = remove_files(udid, pkpass_dir, [asset])
+        except Exception:
+            ok_removed = False
+        if ok_removed:
+            print(json.dumps({
+                "type": "progress", "card": card_hash,
+                "code": "restore.removed_skin_artwork",
+                "message": f"Removed {asset}: the original artwork had no such file"
+            }))
+            sys.stdout.flush()
+        else:
+            stuck.append(asset)
+            all_ok = False
+
     # Same cache clearing the flash does, or Wallet keeps showing the skin.
     print(json.dumps({
         "type": "progress", "card": card_hash, "step": 2, "total": total_steps,
@@ -192,10 +228,13 @@ def cmd_restore(udid: str, card_hash: str) -> bool:
             all_ok = False
 
     if not all_ok:
+        # Name what is still on the card. A bare failure here would hide a skin
+        # that is still being rendered.
+        detail = f" Could not remove {', '.join(stuck)}." if stuck else ""
         print(json.dumps({
             "type": "error", "card": card_hash, "step": 2, "total": total_steps,
             "code": "restore.failed",
-            "message": f"Could not fully restore {card_hash[:12]}..."
+            "message": f"Could not fully restore {card_hash[:12]}...{detail}"
         }))
         sys.stdout.flush()
         return False

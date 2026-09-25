@@ -12,6 +12,7 @@ import os
 import posixpath
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import time
@@ -98,31 +99,61 @@ def card_backup_dir(udid: str, card_hash: str) -> Path:
     return BACKUPS_ROOT / _backup_slug(udid) / _backup_slug(card_hash)
 
 
+def _backup_is_complete(d: Path) -> bool:
+    """True only when every file a flash overwrites is present in the backup.
+
+    Half a backup is worse than none. ``has_card_backup`` gates the whole
+    restore offer, and restoring from a partial backup would put some of the
+    artwork back while leaving the rest of the skin on the card -- the app would
+    report a restore it did not actually perform.
+    """
+    for asset in BACKED_UP_ASSETS:
+        f = d / asset
+        try:
+            if not f.is_file() or f.stat().st_size == 0:
+                return False
+        except OSError:
+            return False
+    return True
+
+
+def _discard_card_backup(d: Path) -> None:
+    """Removes a backup directory, so a half-written one cannot linger."""
+    shutil.rmtree(d, ignore_errors=True)
+
+
 def has_card_backup(udid: str, card_hash: str) -> bool:
-    """True only when the original artwork is actually sitting on disk.
+    """True only when the whole original artwork is actually sitting on disk.
 
     The app asks this before offering to restore, so a card whose backup never
     got taken is never offered a restore it cannot deliver.
     """
     d = card_backup_dir(udid, card_hash)
-    return d.is_dir() and any(f.is_file() and f.stat().st_size > 0 for f in d.iterdir())
+    return d.is_dir() and _backup_is_complete(d)
 
 
 def save_card_backup(udid: str, card_hash: str, assets: list[tuple[str, bytes]]) -> bool:
     """Stores the original artwork, once. Later flashes must not overwrite it.
 
-    Returns False if nothing usable was stored, so the caller can record that
-    this card has no way back rather than implying it does.
+    Returns False unless every file a flash can overwrite was captured, so the
+    caller records that this card has no way back rather than implying it does.
+    A partial capture is thrown away rather than kept: it would look like a
+    backup, and then restore the card only halfway.
     """
-    usable = [(name, data) for name, data in assets if data]
-    if not usable:
-        return False
+    captured = {name: data for name, data in assets if data}
     d = card_backup_dir(udid, card_hash)
+    if any(not captured.get(asset) for asset in BACKED_UP_ASSETS):
+        _discard_card_backup(d)
+        return False
     try:
+        # Start from an empty directory: files left over from an earlier partial
+        # attempt would otherwise sit alongside the fresh ones.
+        _discard_card_backup(d)
         d.mkdir(parents=True, exist_ok=True)
-        for name, data in usable:
+        for name, data in captured.items():
             (d / name).write_bytes(data)
     except OSError:
+        _discard_card_backup(d)
         return False
     return True
 

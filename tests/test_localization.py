@@ -19,6 +19,7 @@ BASE = "en"
 ENTRY = re.compile(r'^\s*"((?:[^"\\]|\\.)*)"\s*=\s*"((?:[^"\\]|\\.)*)"\s*;\s*$')
 # %@ %d %1$@ %2$d %.1f %% ...
 SPECIFIER = re.compile(r'%(?:(\d+)\$)?[-+ 0#]*[\d.]*([@dioux%fFeEgGsS])')
+BREAK = re.compile(r"(\\+)n")
 
 
 def parse(path):
@@ -40,6 +41,11 @@ def specifiers(text):
 
 def strings_files():
     return sorted(LOCALES.glob("*.lproj/Localizable.strings"))
+
+
+def break_escapes(text):
+    """Backslashes before each `n`: one is a newline, two or more is literal text."""
+    return [len(before) for before in BREAK.findall(text)]
 
 
 class LocalizationTests(unittest.TestCase):
@@ -78,6 +84,23 @@ class LocalizationTests(unittest.TestCase):
                     got, want,
                     f"{lang} / {key}: format specifiers changed "
                     f"({want} -> {got}). This crashes at runtime.",
+                )
+
+    def test_line_breaks_are_not_double_escaped(self):
+        """A twice-escaped newline renders as a literal backslash-backed 'n'."""
+        for path in strings_files():
+            lang = path.parent.name
+            entries = parse(path)
+            for key, english in self.base.items():
+                want = break_escapes(english)
+                if not want or key not in entries:
+                    continue
+                got = break_escapes(entries[key])
+                self.assertEqual(
+                    got, want,
+                    f"{lang} / {key}: line breaks were escaped differently "
+                    f"({want} -> {got}). Wallet users in this language would see "
+                    f"the escape as text.",
                 )
 
     def test_no_translation_left_as_english_placeholder(self):

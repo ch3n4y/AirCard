@@ -152,7 +152,7 @@
 "ui.on_your_iphone_double_click" = "Sur votre iPhone, **double-cliquez sur le bouton latéral** (Apple Pay), validez avec **Face ID**, puis **touchez votre carte**.";
 "ui.original_saved" = "Illustration d'origine enregistrée";
 "ui.passcode_theme_file" = "Fichier de thème de code";
-"ui.passcode_theme_successfully_applied_n" = "Thème de code appliqué !\\\\n\\\\nVerrouillez votre iPhone (ou redémarrez-le) pour découvrir votre nouveau clavier.";
+"ui.passcode_theme_successfully_applied_n" = "Thème de code appliqué !\n\nVerrouillez votre iPhone (ou redémarrez-le) pour découvrir votre nouveau clavier.";
 "ui.passcode_themes" = "Thèmes de code :";
 "ui.passthm_standard_cowabunga_nugget" = "standard .passthm (Cowabunga / Nugget)";
 "ui.paste_one_or_more_card" = "Collez une ou plusieurs empreintes de carte (séparées par des espaces, des virgules ou des retours à la ligne) :";
@@ -177,7 +177,7 @@
 "ui.skin_already_on_iphone" = "Habillage déjà sur l'iPhone";
 "ui.skin_assigned_and_ready" = "Habillage attribué · Prêt";
 "ui.skin_changed_will_be_flashed" = "Habillage modifié, sera installé";
-"ui.skins_successfully_applied_to_all" = "Habillages appliqués à toutes les cartes sélectionnées !\\\\n\\\\nForcez la fermeture de Wallet sur votre iPhone (ou redémarrez-le) pour découvrir vos nouveaux visuels.";
+"ui.skins_successfully_applied_to_all" = "Habillages appliqués à toutes les cartes sélectionnées !\n\nForcez la fermeture de Wallet sur votre iPhone (ou redémarrez-le) pour découvrir vos nouveaux visuels.";
 "ui.slice_circle_desc" = "L'illustration est découpée en icônes rondes, une par touche.";
 "ui.slice_seamless_desc" = "L'illustration s'étend sur tout le clavier, sans découpe ronde (style Adobe Dog).";
 "ui.slicing_style" = "Style de découpe";

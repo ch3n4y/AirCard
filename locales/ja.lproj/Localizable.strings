@@ -152,7 +152,7 @@
 "ui.on_your_iphone_double_click" = "iPhoneで**サイドボタンをダブルクリック**して（Apple Pay）、**Face ID**で認証し、**カードをタップ**します。";
 "ui.original_saved" = "元のアートワーク保存済み";
 "ui.passcode_theme_file" = "パスコードテーマファイル";
-"ui.passcode_theme_successfully_applied_n" = "パスコードテーマを適用しました！\\\\n\\\\niPhoneをロックする（または再起動する）と、新しいパスコードキーパッドが表示されます。";
+"ui.passcode_theme_successfully_applied_n" = "パスコードテーマを適用しました！\n\niPhoneをロックする（または再起動する）と、新しいパスコードキーパッドが表示されます。";
 "ui.passcode_themes" = "パスコードテーマ：";
 "ui.passthm_standard_cowabunga_nugget" = ".passthm標準形式（Cowabunga／Nugget）";
 "ui.paste_one_or_more_card" = "カードハッシュを1つ以上ペーストしてください（スペース、カンマ、改行で区切ります）：";
@@ -177,7 +177,7 @@
 "ui.skin_already_on_iphone" = "スキンは書き込み済み";
 "ui.skin_assigned_and_ready" = "スキン設定済み・準備完了";
 "ui.skin_changed_will_be_flashed" = "スキンが変更されたため書き込みます";
-"ui.skins_successfully_applied_to_all" = "選択したすべてのカードにスキンを適用しました！\\\\n\\\\niPhoneでWalletアプリを強制終了する（または再起動する）と、新しいデザインが表示されます。";
+"ui.skins_successfully_applied_to_all" = "選択したすべてのカードにスキンを適用しました！\n\niPhoneでWalletアプリを強制終了する（または再起動する）と、新しいデザインが表示されます。";
 "ui.slice_circle_desc" = "アートワークを円形のボタンアイコンに切り抜きます。";
 "ui.slice_seamless_desc" = "アートワークを円形に切り抜かず、キー全体にまたがって表示します（Adobe Dogスタイル）。";
 "ui.slicing_style" = "分割スタイル";
